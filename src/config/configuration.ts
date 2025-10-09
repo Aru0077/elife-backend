@@ -17,8 +17,10 @@ export default () => ({
     payment: {
       mchId: process.env.WECHAT_MCH_ID, // 子商户号
       envId: process.env.WECHAT_ENV_ID, // 云托管环境ID
-      callbackService: process.env.WECHAT_PAYMENT_CALLBACK_SERVICE || 'elife-backend', // 回调服务名
-      callbackPath: process.env.WECHAT_PAYMENT_CALLBACK_PATH || '/payment/callback', // 回调路径（不含订单号）
+      callbackService:
+        process.env.WECHAT_PAYMENT_CALLBACK_SERVICE || 'elife-backend', // 回调服务名
+      callbackPath:
+        process.env.WECHAT_PAYMENT_CALLBACK_PATH || '/payment/callback', // 回调路径（不含订单号）
       serverIp: process.env.WECHAT_PAYMENT_SERVER_IP || '127.0.0.1', // 服务器IP
     },
   },

@@ -116,11 +116,14 @@ export class UnitelService {
           );
         } else {
           // 非最后一次，记录警告并重试
-          this.logger.warn(`获取 Unitel access token 失败，${retryDelay}ms 后重试`, {
-            message: err.message,
-            attempt,
-            maxRetries,
-          });
+          this.logger.warn(
+            `获取 Unitel access token 失败，${retryDelay}ms 后重试`,
+            {
+              message: err.message,
+              attempt,
+              maxRetries,
+            },
+          );
           // 等待后重试
           await new Promise((resolve) => setTimeout(resolve, retryDelay));
         }

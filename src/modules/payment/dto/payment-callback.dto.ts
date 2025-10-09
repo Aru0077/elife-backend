@@ -56,7 +56,11 @@ export class PaymentCallbackDto {
   @ApiProperty({ description: '付款银行', required: false })
   bankType?: string;
 
-  @ApiProperty({ description: '订单总金额（分）', example: 100, required: false })
+  @ApiProperty({
+    description: '订单总金额（分）',
+    example: 100,
+    required: false,
+  })
   totalFee?: number;
 
   @ApiProperty({ description: '货币种类', example: 'CNY', required: false })

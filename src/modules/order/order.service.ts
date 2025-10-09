@@ -7,7 +7,7 @@ import {
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { UnitelService } from '../unitel/unitel.service';
 import { CreateOrderDto, QueryOrderDto } from './dto';
-import { PaymentStatus, RechargeStatus } from './enums';
+import { PaymentStatus, RechargeStatus, RechargeType } from './enums';
 import { nanoid } from 'nanoid';
 import { Prisma } from '@prisma/client';
 
@@ -32,7 +32,10 @@ export class OrderService {
   /**
    * 创建订单
    */
-  async create(openid: string, createOrderDto: CreateOrderDto): Promise<Prisma.OrderGetPayload<object>> {
+  async create(
+    openid: string,
+    createOrderDto: CreateOrderDto,
+  ): Promise<Prisma.OrderGetPayload<object>> {
     try {
       // 验证用户是否存在
       const user = await this.prisma.user.findUnique({
@@ -79,17 +82,22 @@ export class OrderService {
   /**
    * 查询订单详情
    */
-  async findOne(orderNumber: string, openid?: string): Promise<Prisma.OrderGetPayload<{
-    include: {
-      user: {
-        select: {
-          openid: true;
-          appid: true;
-          createdAt: true;
+  async findOne(
+    orderNumber: string,
+    openid?: string,
+  ): Promise<
+    Prisma.OrderGetPayload<{
+      include: {
+        user: {
+          select: {
+            openid: true;
+            appid: true;
+            createdAt: true;
+          };
         };
       };
-    };
-  }>> {
+    }>
+  > {
     try {
       const whereClause: Prisma.OrderWhereUniqueInput = { orderNumber };
 
@@ -368,22 +376,45 @@ export class OrderService {
         },
       });
 
-      // 4. 调用 Unitel API 充值（只调用一次）
-      const rechargeDto = {
-        msisdn: order.phoneNumber,
-        card: order.productCode,
-        vatflag: '0', // 暂不开发票
-        transactions: [
-          {
-            journal_id: orderNumber,
-            amount: order.productPriceTg.toString(),
-            description: 'Recharge',
-            account: 'WECHAT',
-          },
-        ],
-      };
+      // 4. 根据充值类型调用不同的 Unitel API
+      let result;
+      if (order.productRechargeType === RechargeType.DATA) {
+        // 流量包激活
+        const dataPackageDto = {
+          msisdn: order.phoneNumber,
+          package: order.productCode,
+          vatflag: '0', // 暂不开发票
+          transactions: [
+            {
+              journal_id: orderNumber,
+              amount: order.productPriceTg.toString(),
+              description: 'Data Package',
+              account: 'WECHAT',
+            },
+          ],
+        };
 
-      const result = await this.unitelService.recharge(rechargeDto);
+        this.logger.log(`调用流量包激活 API: ${orderNumber}, 套餐: ${order.productCode}`);
+        result = await this.unitelService.activateDataPackage(dataPackageDto);
+      } else {
+        // 话费充值
+        const rechargeDto = {
+          msisdn: order.phoneNumber,
+          card: order.productCode,
+          vatflag: '0', // 暂不开发票
+          transactions: [
+            {
+              journal_id: orderNumber,
+              amount: order.productPriceTg.toString(),
+              description: 'Recharge',
+              account: 'WECHAT',
+            },
+          ],
+        };
+
+        this.logger.log(`调用话费充值 API: ${orderNumber}, 卡号: ${order.productCode}`);
+        result = await this.unitelService.recharge(rechargeDto);
+      }
 
       // 5. 根据充值结果更新订单状态
       const isSuccess = result.result === 'success';

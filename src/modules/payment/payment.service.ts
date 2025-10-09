@@ -10,10 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { firstValueFrom } from 'rxjs';
-import {
-  WechatPayResponse,
-  PaymentInfo,
-} from './interfaces/payment.interface';
+import { WechatPayResponse, PaymentInfo } from './interfaces/payment.interface';
 
 /**
  * 微信支付服务
@@ -81,9 +78,7 @@ export class PaymentService {
           service: this.configService.get<string>(
             'wechat.payment.callbackService',
           ),
-          path: this.configService.get<string>(
-            'wechat.payment.callbackPath',
-          ),
+          path: this.configService.get<string>('wechat.payment.callbackPath'),
         },
       };
 
@@ -178,6 +173,8 @@ export class PaymentService {
   private getServerIp(): string {
     // 在云托管环境中可以使用固定值
     // 也可以尝试从环境变量或请求中获取
-    return this.configService.get<string>('wechat.payment.serverIp') || '127.0.0.1';
+    return (
+      this.configService.get<string>('wechat.payment.serverIp') || '127.0.0.1'
+    );
   }
 }

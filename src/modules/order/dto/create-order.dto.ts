@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsOptional, IsInt } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsInt, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
+import { RechargeType } from '../enums';
 
 export class CreateOrderDto {
   @ApiProperty({ description: '充值手机号' })
@@ -13,10 +14,14 @@ export class CreateOrderDto {
   @IsString()
   productOperator!: string;
 
-  @ApiProperty({ description: '充值类型' })
+  @ApiProperty({
+    description: '充值类型',
+    enum: RechargeType,
+    example: RechargeType.VOICE
+  })
   @IsNotEmpty()
-  @IsString()
-  productRechargeType!: string;
+  @IsEnum(RechargeType, { message: '充值类型必须是 voice（话费）或 data（流量）' })
+  productRechargeType!: RechargeType;
 
   @ApiProperty({ description: '产品名称' })
   @IsNotEmpty()

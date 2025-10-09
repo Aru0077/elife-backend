@@ -12,6 +12,9 @@ RUN npm ci
 # 复制源代码
 COPY . .
 
+# 生成 Prisma Client
+RUN npx prisma generate
+
 # 构建应用
 RUN npm run build
 
@@ -28,6 +31,12 @@ COPY package*.json ./
 
 # 仅安装生产依赖
 RUN npm ci --omit=dev && npm cache clean --force
+
+# 复制 Prisma schema
+COPY --from=builder /app/prisma ./prisma
+
+# 生成 Prisma Client（生产环境）
+RUN npx prisma generate
 
 # 从构建阶段复制编译后的代码
 COPY --from=builder /app/dist ./dist
