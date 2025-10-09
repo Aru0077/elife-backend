@@ -1,0 +1,66 @@
+// Prisma Schema for eLife Backend
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户表（与旧数据库结构一致）
+model User {
+  // 微信标识（主键）
+  openid      String    @id @db.VarChar(50)
+  unionid     String?   @unique @db.VarChar(50)  // UnionID 用于打通不同应用（为小程序预留）
+  appid       String?   @db.VarChar(50)  // 记录来源 AppID（为小程序和公众号预留）
+
+  // 时间戳
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // 关联
+  orders      Order[]
+
+  @@index([createdAt])
+  @@map("users")
+}
+
+// 订单表
+model Order {
+  // 订单基本信息
+  orderNumber    String    @id @map("order_number") @db.VarChar(32)
+  openid         String    @db.VarChar(50)
+  phoneNumber    String    @map("phone_number") @db.VarChar(20)
+
+  // 产品信息
+  productOperator     String    @map("product_operator") @db.VarChar(50)
+  productRechargeType String    @map("product_recharge_type") @db.VarChar(50)
+  productName         String    @map("product_name") @db.VarChar(100)
+  productCode         String    @map("product_code") @db.VarChar(50)
+  productPriceTg      Decimal   @map("product_price_tg") @db.Decimal(10, 2)
+  productPriceRmb     Decimal   @map("product_price_rmb") @db.Decimal(10, 2)
+  productUnit         String?   @map("product_unit") @db.VarChar(20)
+  productData         String?   @map("product_data") @db.Text
+  productDays         Int?      @map("product_days")
+
+  // 订单状态
+  paymentStatus  String    @default("unpaid") @map("payment_status") @db.VarChar(20)
+  rechargeStatus String?   @map("recharge_status") @db.VarChar(20)
+
+  // 时间戳
+  createdAt      DateTime  @default(now()) @map("created_at")
+  paidAt         DateTime? @map("paid_at")
+  rechargeAt     DateTime? @map("recharge_at")
+
+  // 关联
+  user           User      @relation(fields: [openid], references: [openid])
+
+  @@index([openid])
+  @@index([paymentStatus])
+  @@index([rechargeStatus])
+  @@index([createdAt])
+  @@index([rechargeStatus, paidAt])
+  @@map("orders")
+}

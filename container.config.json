@@ -1,0 +1,23 @@
+{
+  "containerPort": 80,
+  "dockerfilePath": "Dockerfile",
+  "buildDir": "",
+  "minNum": 0,
+  "maxNum": 50,
+  "cpu": 0.25,
+  "mem": 0.5,
+  "policyType": "cpu",
+  "policyThreshold": 60,
+  "envParams": {
+    "NODE_ENV": "production",
+    "PORT": "80",
+    "WECHAT_APPID": "",
+    "WECHAT_SECRET": "",
+    "WECHAT_MP_APPID": "",
+    "WECHAT_MP_SECRET": "",
+    "LOG_LEVEL": "info",
+    "LOG_MAX_FILES": "30"
+  },
+  "customLogs": "stdout",
+  "initialDelaySeconds": 10
+}
