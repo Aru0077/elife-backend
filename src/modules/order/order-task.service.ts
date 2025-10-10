@@ -39,7 +39,6 @@ export class OrderTaskService {
       });
 
       if (pendingOrders.length === 0) {
-        this.logger.debug('无需补偿的 PENDING 订单');
         return;
       }
 
@@ -85,7 +84,6 @@ export class OrderTaskService {
       });
 
       if (failedOrders.length === 0) {
-        this.logger.debug('无失败的充值订单');
         return;
       }
 
