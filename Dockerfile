@@ -46,6 +46,7 @@ RUN mkdir -p logs
 
 # 设置环境变量
 ENV NODE_ENV=production
+ENV PORT=80
 
 # 暴露端口
 EXPOSE 80
