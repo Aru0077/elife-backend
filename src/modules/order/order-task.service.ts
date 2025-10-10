@@ -15,7 +15,7 @@ export class OrderTaskService {
 
   /**
    * 每分钟补偿卡在 PENDING 状态的订单
-   * 处理因服务重启等原因丢失的充值任务
+   * 处理因服务重启等原因丢失的充值任务 daixiufu
    */
   @Cron(CronExpression.EVERY_MINUTE)
   async retryPendingRecharges() {
