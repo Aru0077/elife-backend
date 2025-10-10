@@ -3,12 +3,12 @@ import { IsNotEmpty, IsString, IsIn } from 'class-validator';
 
 export class QueryServiceDto {
   @ApiProperty({ description: '手机号码', example: '88616609' })
-  @IsNotEmpty()
-  @IsString()
+  @IsNotEmpty({ message: '手机号码不能为空' })
+  @IsString({ message: '手机号码必须是字符串' })
   msisdn!: string;
 
   @ApiProperty({ description: '是否获取资费详情 (0-否 1-是)', example: '1' })
-  @IsIn(['0', '1'])
+  @IsIn(['0', '1'], { message: '资费详情参数必须是 0 或 1' })
   info!: string;
 }
 

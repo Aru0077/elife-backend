@@ -11,46 +11,46 @@ import { Type } from 'class-transformer';
 // 交易信息
 export class TransactionDto {
   @ApiProperty({ description: '交易ID', example: 'TXN20231001001' })
-  @IsNotEmpty()
-  @IsString()
+  @IsNotEmpty({ message: '交易ID不能为空' })
+  @IsString({ message: '交易ID必须是字符串' })
   journal_id!: string;
 
   @ApiProperty({ description: '交易金额', example: '1500.00' })
-  @IsNotEmpty()
-  @IsString()
+  @IsNotEmpty({ message: '交易金额不能为空' })
+  @IsString({ message: '交易金额必须是字符串' })
   amount!: string;
 
   @ApiProperty({ description: '交易描述', example: 'Recharge' })
-  @IsNotEmpty()
-  @IsString()
+  @IsNotEmpty({ message: '交易描述不能为空' })
+  @IsString({ message: '交易描述必须是字符串' })
   description!: string;
 
   @ApiProperty({ description: '账户', example: 'ACC001' })
-  @IsNotEmpty()
-  @IsString()
+  @IsNotEmpty({ message: '账户不能为空' })
+  @IsString({ message: '账户必须是字符串' })
   account!: string;
 }
 
 export class RechargeDto {
   @ApiProperty({ description: '手机号码', example: '88616609' })
-  @IsNotEmpty()
-  @IsString()
+  @IsNotEmpty({ message: '手机号码不能为空' })
+  @IsString({ message: '手机号码必须是字符串' })
   msisdn!: string;
 
   @ApiProperty({ description: '话费卡代码', example: 'HB1500' })
-  @IsNotEmpty()
-  @IsString()
+  @IsNotEmpty({ message: '话费卡代码不能为空' })
+  @IsString({ message: '话费卡代码必须是字符串' })
   card!: string;
 
   @ApiProperty({ description: '是否开发票 (0-否 1-是)', example: '1' })
-  @IsIn(['0', '1'])
+  @IsIn(['0', '1'], { message: '开发票参数必须是 0 或 1' })
   vatflag!: string;
 
   @ApiProperty({ description: '税号', required: false })
   vat_register_no?: string;
 
   @ApiProperty({ description: '交易列表', type: [TransactionDto] })
-  @IsArray()
+  @IsArray({ message: '交易列表必须是数组' })
   @ValidateNested({ each: true })
   @Type(() => TransactionDto)
   transactions!: TransactionDto[];

@@ -5,12 +5,12 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '@prisma/client';
 
 @ApiTags('用户')
-@Controller('users')
+@Controller('user')
 @UseGuards(WechatAuthGuard)
 @ApiBearerAuth()
 export class UserController {
-  @Get('me')
-  @ApiOperation({ summary: '获取当前用户信息' })
+  @Get('login')
+  @ApiOperation({ summary: '自动登录接口 - 小程序/公众号打开时调用' })
   getCurrentUser(@CurrentUser() user: User) {
     return user;
   }

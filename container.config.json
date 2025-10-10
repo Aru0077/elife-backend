@@ -12,9 +12,7 @@
     "NODE_ENV": "production",
     "PORT": "80",
     "WECHAT_APPID": "",
-    "WECHAT_SECRET": "",
     "WECHAT_MP_APPID": "",
-    "WECHAT_MP_SECRET": "",
     "LOG_LEVEL": "info",
     "LOG_MAX_FILES": "30"
   },

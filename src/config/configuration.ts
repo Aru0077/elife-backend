@@ -3,15 +3,13 @@ export default () => ({
   port: parseInt(process.env.PORT || '3000', 10),
 
   wechat: {
-    // 小程序配置
+    // 小程序配置（仅用于标识，云托管环境自动处理认证）
     miniprogram: {
       appid: process.env.WECHAT_APPID,
-      secret: process.env.WECHAT_SECRET,
     },
-    // 公众号配置
+    // 公众号配置（仅用于标识，云托管环境自动处理认证）
     mp: {
       appid: process.env.WECHAT_MP_APPID,
-      secret: process.env.WECHAT_MP_SECRET,
     },
     // 微信支付配置
     payment: {

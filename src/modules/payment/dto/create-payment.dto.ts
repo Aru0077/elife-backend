@@ -9,7 +9,7 @@ export class CreatePaymentDto {
     description: '订单号',
     example: 'ORD1728546789123abcd',
   })
-  @IsString()
-  @IsNotEmpty()
+  @IsString({ message: '订单号必须是字符串' })
+  @IsNotEmpty({ message: '订单号不能为空' })
   orderNumber!: string;
 }
