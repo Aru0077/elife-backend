@@ -107,9 +107,11 @@ export class PaymentService {
 
       if (errcode !== 0 || !respdata) {
         this.logger.error('统一下单失败', {
+          message: errmsg || '未知错误',
           errcode,
-          errmsg,
           orderNumber,
+          openid,
+          total_fee: unifiedOrderData.total_fee,
         });
         throw new HttpException(
           errmsg || '创建支付订单失败',
@@ -123,11 +125,12 @@ export class PaymentService {
         respdata.result_code !== 'SUCCESS'
       ) {
         this.logger.error('统一下单业务失败', {
+          message: respdata.err_code_des || respdata.return_msg || '业务失败',
           return_code: respdata.return_code,
           result_code: respdata.result_code,
           err_code: respdata.err_code,
-          err_code_des: respdata.err_code_des,
           orderNumber,
+          openid,
         });
         throw new HttpException(
           respdata.err_code_des || respdata.return_msg || '创建支付订单失败',
@@ -138,8 +141,10 @@ export class PaymentService {
       // 8. 提取 payment 对象
       if (!respdata.payment) {
         this.logger.error('统一下单返回缺少 payment 字段', {
-          respdata,
+          message: '微信返回数据异常：缺少 payment 字段',
           orderNumber,
+          openid,
+          prepay_id: respdata.prepay_id,
         });
         throw new HttpException(
           '支付参数获取失败',
@@ -151,6 +156,8 @@ export class PaymentService {
         message: '统一下单成功',
         orderNumber,
         prepay_id: respdata.prepay_id,
+        total_fee: unifiedOrderData.total_fee,
+        openid,
       });
 
       // 9. 返回小程序支付参数
@@ -158,9 +165,10 @@ export class PaymentService {
     } catch (error) {
       const err = error as Error;
       this.logger.error('创建支付订单异常', {
-        orderNumber,
-        error: err.message,
+        message: err.message,
         stack: err.stack,
+        orderNumber,
+        openid,
       });
       throw error;
     }

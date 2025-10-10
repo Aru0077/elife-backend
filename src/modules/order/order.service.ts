@@ -394,7 +394,13 @@ export class OrderService {
           ],
         };
 
-        this.logger.log(`调用流量包激活 API: ${orderNumber}, 套餐: ${order.productCode}`);
+        this.logger.log({
+          message: '调用流量包激活 API',
+          orderNumber,
+          msisdn: order.phoneNumber,
+          package: order.productCode,
+          amount: order.productPriceTg.toString(),
+        });
         result = await this.unitelService.activateDataPackage(dataPackageDto);
       } else {
         // 话费充值
@@ -412,7 +418,13 @@ export class OrderService {
           ],
         };
 
-        this.logger.log(`调用话费充值 API: ${orderNumber}, 卡号: ${order.productCode}`);
+        this.logger.log({
+          message: '调用话费充值 API',
+          orderNumber,
+          msisdn: order.phoneNumber,
+          card: order.productCode,
+          amount: order.productPriceTg.toString(),
+        });
         result = await this.unitelService.recharge(rechargeDto);
       }
 
@@ -427,9 +439,16 @@ export class OrderService {
         },
       });
 
-      this.logger.log(
-        `订单充值${isSuccess ? '成功' : '失败'}: ${orderNumber}, 结果: ${result.msg}`,
-      );
+      this.logger.log({
+        message: `订单充值${isSuccess ? '成功' : '失败'}`,
+        orderNumber,
+        rechargeStatus: isSuccess ? 'success' : 'failed',
+        apiResult: result.result,
+        apiCode: result.code,
+        apiMessage: result.msg,
+        phoneNumber: order.phoneNumber,
+        productCode: order.productCode,
+      });
 
       return { status: isSuccess ? 'success' : 'failed', result };
     } catch (error) {

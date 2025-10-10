@@ -144,6 +144,12 @@ export class UnitelService {
     const token = await this.getAccessToken();
 
     try {
+      this.logger.debug({
+        message: '查询资费列表请求',
+        msisdn: dto.msisdn,
+        info: dto.info,
+      });
+
       const response = await firstValueFrom(
         this.httpService.post<ServiceTypeResponse>(
           `${this.apiUrl}${this.API_ENDPOINTS.SERVICE_TYPE}`,
@@ -163,21 +169,29 @@ export class UnitelService {
         throw new Error(`Unitel API error: ${data.code} - ${data.msg}`);
       }
 
+      this.logger.debug({
+        message: '查询资费列表成功',
+        result: data.result,
+        code: data.code,
+        servicetype: data.servicetype,
+        hasService: !!data.service,
+      });
+
       return data;
     } catch (error: unknown) {
-      this.logger.error('查询 Unitel 资费列表失败', error);
+      const err = error as Error & {
+        response?: { status?: number; data?: { msg?: string } };
+      };
       const errorMessage =
-        error &&
-        typeof error === 'object' &&
-        'response' in error &&
-        error.response &&
-        typeof error.response === 'object' &&
-        'data' in error.response &&
-        error.response.data &&
-        typeof error.response.data === 'object' &&
-        'msg' in error.response.data
-          ? String(error.response.data.msg)
-          : 'Failed to query service types';
+        err.response?.data?.msg || 'Failed to query service types';
+
+      this.logger.error('查询 Unitel 资费列表失败', {
+        message: err.message,
+        stack: err.stack,
+        status: err.response?.status,
+        apiMessage: err.response?.data?.msg,
+      });
+
       throw new HttpException(errorMessage, HttpStatus.BAD_REQUEST);
     }
   }
@@ -189,6 +203,13 @@ export class UnitelService {
     const token = await this.getAccessToken();
 
     try {
+      this.logger.log({
+        message: '发起话费充值请求',
+        msisdn: dto.msisdn,
+        card: dto.card,
+        journal_id: dto.transactions[0]?.journal_id,
+      });
+
       const response = await firstValueFrom(
         this.httpService.post<RechargeResponse>(
           `${this.apiUrl}${this.API_ENDPOINTS.RECHARGE}`,
@@ -208,22 +229,31 @@ export class UnitelService {
         throw new Error(`Unitel API error: ${data.code} - ${data.msg}`);
       }
 
-      this.logger.log(`话费充值成功: ${dto.msisdn}, 金额: ${dto.card}`);
+      this.logger.log({
+        message: '话费充值成功',
+        msisdn: dto.msisdn,
+        card: dto.card,
+        result: data.result,
+        code: data.code,
+        msg: data.msg,
+        journal_id: dto.transactions[0]?.journal_id,
+      });
       return data;
     } catch (error: unknown) {
-      this.logger.error('Unitel 话费充值失败', error);
-      const errorMessage =
-        error &&
-        typeof error === 'object' &&
-        'response' in error &&
-        error.response &&
-        typeof error.response === 'object' &&
-        'data' in error.response &&
-        error.response.data &&
-        typeof error.response.data === 'object' &&
-        'msg' in error.response.data
-          ? String(error.response.data.msg)
-          : 'Failed to recharge';
+      const err = error as Error & {
+        response?: { status?: number; data?: { msg?: string } };
+      };
+      const errorMessage = err.response?.data?.msg || 'Failed to recharge';
+
+      this.logger.error('Unitel 话费充值失败', {
+        message: err.message,
+        stack: err.stack,
+        status: err.response?.status,
+        apiMessage: err.response?.data?.msg,
+        msisdn: dto.msisdn,
+        card: dto.card,
+      });
+
       throw new HttpException(errorMessage, HttpStatus.BAD_REQUEST);
     }
   }
@@ -235,6 +265,13 @@ export class UnitelService {
     const token = await this.getAccessToken();
 
     try {
+      this.logger.log({
+        message: '发起流量包激活请求',
+        msisdn: dto.msisdn,
+        package: dto.package,
+        journal_id: dto.transactions[0]?.journal_id,
+      });
+
       const response = await firstValueFrom(
         this.httpService.post<DataPackageResponse>(
           `${this.apiUrl}${this.API_ENDPOINTS.DATA_PACKAGE}`,
@@ -254,22 +291,32 @@ export class UnitelService {
         throw new Error(`Unitel API error: ${data.code} - ${data.msg}`);
       }
 
-      this.logger.log(`流量包激活成功: ${dto.msisdn}, 套餐: ${dto.package}`);
+      this.logger.log({
+        message: '流量包激活成功',
+        msisdn: dto.msisdn,
+        package: dto.package,
+        result: data.result,
+        code: data.code,
+        msg: data.msg,
+        journal_id: dto.transactions[0]?.journal_id,
+      });
       return data;
     } catch (error: unknown) {
-      this.logger.error('Unitel 流量包激活失败', error);
+      const err = error as Error & {
+        response?: { status?: number; data?: { msg?: string } };
+      };
       const errorMessage =
-        error &&
-        typeof error === 'object' &&
-        'response' in error &&
-        error.response &&
-        typeof error.response === 'object' &&
-        'data' in error.response &&
-        error.response.data &&
-        typeof error.response.data === 'object' &&
-        'msg' in error.response.data
-          ? String(error.response.data.msg)
-          : 'Failed to activate data package';
+        err.response?.data?.msg || 'Failed to activate data package';
+
+      this.logger.error('Unitel 流量包激活失败', {
+        message: err.message,
+        stack: err.stack,
+        status: err.response?.status,
+        apiMessage: err.response?.data?.msg,
+        msisdn: dto.msisdn,
+        package: dto.package,
+      });
+
       throw new HttpException(errorMessage, HttpStatus.BAD_REQUEST);
     }
   }

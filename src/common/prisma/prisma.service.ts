@@ -18,11 +18,18 @@ export class PrismaService
       await this.$connect();
       this.logger.log('数据库连接成功');
     } catch (error) {
+      const err = error as Error;
       if (process.env.NODE_ENV === 'production') {
-        this.logger.error('数据库连接失败', error);
+        this.logger.error('数据库连接失败', {
+          message: err.message,
+          stack: err.stack,
+        });
         throw error;
       } else {
-        this.logger.warn('数据库连接失败 (开发环境)', error);
+        this.logger.warn('数据库连接失败 (开发环境)', {
+          message: err.message,
+          stack: err.stack,
+        });
       }
     }
   }
