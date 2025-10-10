@@ -30,7 +30,7 @@
     "prisma": "^6.16.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "tencentcloud-sdk-nodejs-cls": "^4.1.126"
+    "tencentcloud-cls-sdk-js": "^1.0.6"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

@@ -1,21 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as tencentcloud from 'tencentcloud-sdk-nodejs-cls';
+import {
+  AsyncClient,
+  LogItem,
+  LogGroup,
+  Content,
+  PutLogsRequest,
+} from 'tencentcloud-cls-sdk-js';
 
-const ClsClient = tencentcloud.cls.v20201016.Client;
-
-interface LogItem {
+interface LogEntry {
   timestamp: number;
-  content: string;
+  content: Record<string, unknown>;
 }
 
 @Injectable()
 export class ClsService {
   private readonly logger = new Logger(ClsService.name);
-  private client: typeof ClsClient.prototype | null = null;
+  private client: AsyncClient | null = null;
   private enabled: boolean;
   private topicId: string;
-  private logQueue: LogItem[] = [];
+  private logQueue: LogEntry[] = [];
   private uploadTimer: NodeJS.Timeout | null = null;
 
   // 批量上传配置
@@ -35,28 +39,24 @@ export class ClsService {
   private initClient() {
     const secretId = this.configService.get<string>('cls.secretId');
     const secretKey = this.configService.get<string>('cls.secretKey');
-    const region = this.configService.get<string>('cls.region');
+    const endpoint = this.configService.get<string>('cls.endpoint');
+    const retryTimes = this.configService.get<number>('cls.retryTimes') || 10;
 
-    if (!secretId || !secretKey || !this.topicId) {
+    if (!secretId || !secretKey || !this.topicId || !endpoint) {
       this.logger.warn(
-        'CLS配置不完整，跳过初始化（需要 CLS_SECRET_ID, CLS_SECRET_KEY, CLS_TOPIC_ID）',
+        'CLS配置不完整，跳过初始化（需要 CLS_SECRET_ID, CLS_SECRET_KEY, CLS_ENDPOINT, CLS_TOPIC_ID）',
       );
       this.enabled = false;
       return;
     }
 
     try {
-      this.client = new ClsClient({
-        credential: {
-          secretId,
-          secretKey,
-        },
-        region,
-        profile: {
-          httpProfile: {
-            endpoint: 'cls.tencentcloudapi.com',
-          },
-        },
+      this.client = new AsyncClient({
+        endpoint,
+        secretId,
+        secretKey,
+        sourceIp: '127.0.0.1', // 可选，自动填充本机IP
+        retry_times: retryTimes,
       });
 
       this.logger.log('CLS客户端初始化成功');
@@ -84,14 +84,20 @@ export class ClsService {
       return;
     }
 
-    this.logQueue.push({
-      timestamp: Date.now(),
-      content: logContent,
-    });
+    try {
+      const content = JSON.parse(logContent) as Record<string, unknown>;
+      this.logQueue.push({
+        timestamp: Math.floor(Date.now() / 1000),
+        content,
+      });
 
-    // 如果队列满了，立即上传
-    if (this.logQueue.length >= this.BATCH_SIZE) {
-      void this.flushLogs();
+      // 如果队列满了，立即上传
+      if (this.logQueue.length >= this.BATCH_SIZE) {
+        void this.flushLogs();
+      }
+    } catch {
+      // JSON解析失败，忽略
+      this.logger.debug('日志内容JSON解析失败，跳过');
     }
   }
 
@@ -106,15 +112,29 @@ export class ClsService {
     const logsToUpload = this.logQueue.splice(0, this.BATCH_SIZE);
 
     try {
-      // CLS SDK UploadLog 参数格式
-      const params = {
-        TopicId: this.topicId,
-        HashKey: 'elife-backend',
-      };
+      // 创建LogGroup
+      const loggroup = new LogGroup();
 
-      // 直接使用SDK方法
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-      await (this.client as any).UploadLog(params);
+      // 将每条日志转换为LogItem
+      for (const log of logsToUpload) {
+        const item = new LogItem();
+
+        // 将日志内容的每个字段作为Content添加
+        for (const [key, value] of Object.entries(log.content)) {
+          const valueStr =
+            typeof value === 'string' ? value : JSON.stringify(value);
+          item.pushBack(new Content(key, valueStr));
+        }
+
+        item.setTime(log.timestamp);
+        loggroup.addLogs(item);
+      }
+
+      // 创建上传请求
+      const request = new PutLogsRequest(this.topicId, loggroup);
+
+      // 上传日志
+      await this.client.PutLogs(request);
 
       this.logger.debug(`成功上传 ${logsToUpload.length} 条日志到CLS`);
     } catch (error) {

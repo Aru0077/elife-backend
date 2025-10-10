@@ -56,8 +56,9 @@
 CLS_ENABLED=true
 CLS_SECRET_ID=你的SecretId
 CLS_SECRET_KEY=你的SecretKey
-CLS_REGION=ap-guangzhou
+CLS_ENDPOINT=ap-guangzhou.cls.tencentcs.com
 CLS_TOPIC_ID=你的TopicId
+CLS_RETRY_TIMES=10
 ```
 
 ### 生产环境（微信云托管）
@@ -164,8 +165,9 @@ LoggerMiddleware (记录请求日志)
 
 ## 技术实现
 
-- **SDK**: `tencentcloud-sdk-nodejs-cls@4.1.126`
+- **SDK**: `tencentcloud-cls-sdk-js@1.0.6`（专用日志上传SDK）
 - **位置**: `src/common/cls/`
 - **集成点**: `src/common/middleware/logger.middleware.ts`
 - **批量大小**: 10条
 - **上传间隔**: 5秒
+- **上传格式**: Protobuf（LogGroup结构）
