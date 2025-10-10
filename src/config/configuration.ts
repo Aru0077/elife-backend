@@ -33,4 +33,12 @@ export default () => ({
     level: process.env.LOG_LEVEL || 'info',
     maxFiles: parseInt(process.env.LOG_MAX_FILES || '30', 10),
   },
+
+  cls: {
+    enabled: process.env.CLS_ENABLED === 'true',
+    secretId: process.env.CLS_SECRET_ID,
+    secretKey: process.env.CLS_SECRET_KEY,
+    region: process.env.CLS_REGION || 'ap-guangzhou',
+    topicId: process.env.CLS_TOPIC_ID,
+  },
 });

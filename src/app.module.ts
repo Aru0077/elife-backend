@@ -6,6 +6,7 @@ import { validate } from './config/env.validation';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { GlobalHttpModule } from './common/http/http.module';
 import { PrismaModule } from './common/prisma/prisma.module';
+import { ClsModule } from './common/cls/cls.module';
 import { WechatModule } from './modules/wechat/wechat.module';
 import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -27,6 +28,7 @@ import { ProductModule } from './modules/product/product.module';
     ScheduleModule.forRoot(),
     GlobalHttpModule,
     PrismaModule,
+    ClsModule,
     WechatModule,
     HealthModule,
     AuthModule,

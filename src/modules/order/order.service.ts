@@ -378,7 +378,7 @@ export class OrderService {
 
       // 4. 根据充值类型调用不同的 Unitel API
       let result;
-      if (order.productRechargeType === RechargeType.DATA) {
+      if (order.productRechargeType === (RechargeType.DATA as string)) {
         // 流量包激活
         const dataPackageDto = {
           msisdn: order.phoneNumber,
