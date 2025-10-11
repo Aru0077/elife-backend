@@ -1,13 +1,17 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Inject } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { sanitizeHeaders, sanitizeBody } from '../utils/sanitize.util';
+import { ClsService } from '../cls/cls.service';
 
 @Injectable()
 export class HttpLoggingService implements OnModuleInit {
   private readonly logger = new Logger('HTTP-OUT');
 
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    private readonly httpService: HttpService,
+    @Inject(ClsService) private readonly clsService: ClsService,
+  ) {}
 
   onModuleInit() {
     this.setupInterceptors();
@@ -22,7 +26,7 @@ export class HttpLoggingService implements OnModuleInit {
         // @ts-expect-error - 添加自定义 metadata 字段
         config.metadata = { startTime: Date.now() };
 
-        this.logger.log({
+        const logData = {
           type: 'outbound',
           stage: 'request',
           method: config.method?.toUpperCase(),
@@ -31,16 +35,23 @@ export class HttpLoggingService implements OnModuleInit {
           headers: sanitizeHeaders(config.headers),
           params: config.params as Record<string, unknown> | undefined,
           data: sanitizeBody(config.data),
-        });
+        };
+
+        this.logger.log(logData);
+        this.clsService.addLog(JSON.stringify(logData));
 
         return config;
       },
       (error: Error) => {
-        this.logger.error({
+        const errorLog = {
           type: 'outbound',
           stage: 'request_error',
           error: error.message,
-        });
+        };
+
+        this.logger.error(errorLog);
+        this.clsService.addLog(JSON.stringify(errorLog));
+
         return Promise.reject(error);
       },
     );
@@ -55,7 +66,7 @@ export class HttpLoggingService implements OnModuleInit {
         const startTime = metadata?.startTime;
         const duration = startTime ? Date.now() - startTime : 0;
 
-        this.logger.log({
+        const logData = {
           type: 'outbound',
           stage: 'response',
           method: response.config.method?.toUpperCase(),
@@ -65,7 +76,10 @@ export class HttpLoggingService implements OnModuleInit {
           headers: sanitizeHeaders(response.headers),
           data: sanitizeBody(response.data),
           responseTime: `${duration}ms`,
-        });
+        };
+
+        this.logger.log(logData);
+        this.clsService.addLog(JSON.stringify(logData));
 
         return response;
       },
@@ -82,7 +96,7 @@ export class HttpLoggingService implements OnModuleInit {
         const startTime = metadata?.startTime;
         const duration = startTime ? Date.now() - startTime : 0;
 
-        this.logger.error({
+        const errorLog = {
           type: 'outbound',
           stage: 'response_error',
           method: error.config?.method?.toUpperCase(),
@@ -92,7 +106,10 @@ export class HttpLoggingService implements OnModuleInit {
           error: error.message,
           data: sanitizeBody(error.response?.data),
           responseTime: duration > 0 ? `${duration}ms` : undefined,
-        });
+        };
+
+        this.logger.error(errorLog);
+        this.clsService.addLog(JSON.stringify(errorLog));
 
         return Promise.reject(error);
       },
