@@ -56,10 +56,19 @@
 CLS_ENABLED=true
 CLS_SECRET_ID=你的SecretId
 CLS_SECRET_KEY=你的SecretKey
-CLS_ENDPOINT=ap-guangzhou.cls.tencentcs.com
+CLS_ENDPOINT=ap-shanghai.cls.tencentyun.com
 CLS_TOPIC_ID=你的TopicId
 CLS_RETRY_TIMES=10
 ```
+
+**重要说明：**
+- **内网域名 vs 外网域名**：
+  - 内网域名格式：`ap-shanghai.cls.tencentyun.com`（推荐用于微信云托管）
+  - 外网域名格式：`ap-shanghai.cls.tencentcs.com`（用于本地或非腾讯云环境）
+- **地域选择**：endpoint地域必须与Topic所在地域一致
+  - 如果Topic在上海，必须使用 `ap-shanghai`
+  - 如果Topic在广州，必须使用 `ap-guangzhou`
+  - 如果Topic在北京，必须使用 `ap-beijing`
 
 ### 生产环境（微信云托管）
 
@@ -70,8 +79,16 @@ CLS_RETRY_TIMES=10
    - `CLS_ENABLED=true`
    - `CLS_SECRET_ID=你的SecretId`
    - `CLS_SECRET_KEY=你的SecretKey`
-   - `CLS_REGION=ap-guangzhou`（根据实际选择）
+   - `CLS_ENDPOINT=地域.cls.tencentyun.com`（如：ap-shanghai.cls.tencentyun.com）⚠️ 注意使用内网域名
    - `CLS_TOPIC_ID=你的TopicId`
+   - `CLS_RETRY_TIMES=10`（可选，默认10）
+
+**为什么使用内网域名？**
+- 微信云托管运行在腾讯云内网环境
+- 使用内网域名（cls.tencentyun.com）可以：
+  - ✅ 更快的上传速度
+  - ✅ 不消耗公网流量
+  - ✅ 降低成本
 
 ## 日志查询
 
@@ -155,6 +172,37 @@ LoggerMiddleware (记录请求日志)
 3. 查看应用日志是否有CLS错误
 4. 确认网络连接正常
 5. 验证SecretId/SecretKey是否有效
+
+### 404错误：Topic Does Not Exist
+
+如果遇到 `TopicNotExist` 或 404 错误，按以下步骤排查：
+
+1. **确认Topic ID正确**
+   - 登录CLS控制台 https://console.cloud.tencent.com/cls
+   - 查看日志主题详情，复制正确的Topic ID
+   - Topic ID格式：`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+
+2. **检查地域是否匹配**
+   - ⚠️ **最常见原因**：endpoint地域与Topic所在地域不一致
+   - 在CLS控制台左上角查看当前地域（如：上海）
+   - 确保 `CLS_ENDPOINT` 中的地域代码匹配：
+     - 上海：`ap-shanghai.cls.tencentyun.com`
+     - 广州：`ap-guangzhou.cls.tencentyun.com`
+     - 北京：`ap-beijing.cls.tencentyun.com`
+
+3. **验证域名类型**
+   - 微信云托管环境必须使用内网域名：`cls.tencentyun.com`
+   - 本地开发可以使用外网域名：`cls.tencentcs.com`
+
+4. **测试网络连通性**（在微信云托管容器内执行）
+   ```bash
+   # 测试内网域名连通性
+   telnet ap-shanghai.cls.tencentyun.com 80
+   ```
+
+5. **查看初始化日志**
+   - 启动时会输出CLS配置信息：endpoint、topicId、retryTimes
+   - 检查这些值是否与CLS控制台一致
 
 ### 日志无法检索
 

@@ -38,7 +38,7 @@ export default () => ({
     enabled: process.env.CLS_ENABLED === 'true',
     secretId: process.env.CLS_SECRET_ID,
     secretKey: process.env.CLS_SECRET_KEY,
-    endpoint: process.env.CLS_ENDPOINT || 'ap-guangzhou.cls.tencentcs.com',
+    endpoint: process.env.CLS_ENDPOINT || 'ap-shanghai.cls.tencentyun.com',
     topicId: process.env.CLS_TOPIC_ID,
     retryTimes: parseInt(process.env.CLS_RETRY_TIMES || '10', 10),
   },

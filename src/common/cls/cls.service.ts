@@ -59,12 +59,18 @@ export class ClsService {
         retry_times: retryTimes,
       });
 
-      this.logger.log('CLS客户端初始化成功');
+      this.logger.log('CLS客户端初始化成功', {
+        endpoint,
+        topicId: this.topicId,
+        retryTimes,
+      });
     } catch (error) {
       const err = error as Error;
       this.logger.error('CLS客户端初始化失败', {
         message: err.message,
         stack: err.stack,
+        endpoint,
+        topicId: this.topicId,
       });
       this.enabled = false;
     }
