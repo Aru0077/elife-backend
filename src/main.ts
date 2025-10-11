@@ -21,24 +21,46 @@ async function bootstrap() {
   });
 
   // 配置 CORS（跨域资源共享）
+  // 构建允许的域名列表
+  const allowedOrigins: (string | RegExp)[] = [];
+
+  // 生产环境的基础域名
+  if (process.env.NODE_ENV === 'production') {
+    allowedOrigins.push(
+      'https://servicewechat.com',
+      'https://*.servicewechat.com',
+    );
+  }
+
+  // 开发环境的本地域名
+  if (process.env.NODE_ENV !== 'production') {
+    allowedOrigins.push(
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:5174',
+      /^http:\/\/192\.168\.\d+\.\d+:517[34]$/, // 局域网访问
+    );
+  }
+
+  // 从环境变量读取额外的允许域名（用逗号分隔）
+  if (process.env.CORS_ALLOWED_ORIGINS) {
+    const extraOrigins = process.env.CORS_ALLOWED_ORIGINS.split(',').map((o) =>
+      o.trim(),
+    );
+    allowedOrigins.push(...extraOrigins);
+  }
+
+  // 如果没有配置任何域名，允许所有（仅用于紧急情况）
+  const corsOrigin =
+    allowedOrigins.length > 0
+      ? allowedOrigins
+      : process.env.ALLOW_ALL_ORIGINS === 'true'
+        ? true
+        : allowedOrigins;
+
   app.enableCors({
-    origin:
-      process.env.NODE_ENV === 'production'
-        ? [
-            // 生产环境：只允许微信域名和你的前端域名
-            'https://servicewechat.com',
-            'https://*.servicewechat.com',
-            // 添加你的生产环境前端域名
-            // 'https://your-frontend-domain.com',
-          ]
-        : [
-            // 开发环境：允许本地开发
-            'http://localhost:5173',
-            'http://localhost:5174',
-            'http://127.0.0.1:5173',
-            'http://127.0.0.1:5174',
-            /^http:\/\/192\.168\.\d+\.\d+:517[34]$/, // 局域网访问
-          ],
+    origin: corsOrigin,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
