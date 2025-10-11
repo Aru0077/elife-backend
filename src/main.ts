@@ -20,6 +20,36 @@ async function bootstrap() {
           }),
   });
 
+  // 配置 CORS（跨域资源共享）
+  app.enableCors({
+    origin:
+      process.env.NODE_ENV === 'production'
+        ? [
+            // 生产环境：只允许微信域名和你的前端域名
+            'https://servicewechat.com',
+            'https://*.servicewechat.com',
+            // 添加你的生产环境前端域名
+            // 'https://your-frontend-domain.com',
+          ]
+        : [
+            // 开发环境：允许本地开发
+            'http://localhost:5173',
+            'http://localhost:5174',
+            'http://127.0.0.1:5173',
+            'http://127.0.0.1:5174',
+            /^http:\/\/192\.168\.\d+\.\d+:517[34]$/, // 局域网访问
+          ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Mock-Openid', // 开发环境 Mock openid 头
+      'X-WX-OPENID', // 微信 openid 头（生产环境）
+    ],
+    credentials: true, // 允许发送凭证（cookies、auth headers）
+    maxAge: 3600, // 预检请求缓存时间（秒）
+  });
+
   // 全局异常过滤器
   app.useGlobalFilters(new HttpExceptionFilter());
 
