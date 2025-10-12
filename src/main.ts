@@ -66,7 +66,13 @@ async function bootstrap() {
       'Content-Type',
       'Authorization',
       'X-Mock-Openid', // 开发环境 Mock openid 头
-      'X-WX-OPENID', // 微信 openid 头（生产环境）
+      'X-WX-OPENID', // 微信 openid 头
+      'X-WX-APPID', // 微信 appid 头
+      'X-WX-UNIONID', // 微信 unionid 头
+      'X-WX-SOURCE', // 微信来源标识头
+      'X-WX-FROM-OPENID', // 资源复用场景的 openid
+      'X-WX-FROM-APPID', // 资源复用场景的 appid
+      'X-WX-FROM-UNIONID', // 资源复用场景的 unionid
     ],
     credentials: true, // 允许发送凭证（cookies、auth headers）
     maxAge: 3600, // 预检请求缓存时间（秒）

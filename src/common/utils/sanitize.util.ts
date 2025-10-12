@@ -67,7 +67,11 @@ export function sanitizeBody(body: unknown): unknown {
         unknown
       >;
       redactSensitiveFields(sanitized, SENSITIVE_BODY_KEYS);
-      return sanitized;
+
+      // 限制对象大小，防止日志过大
+      const truncated = truncateLargeObject(sanitized, 2048); // 限制2KB
+
+      return truncated;
     } catch {
       return '[Unable to parse body]';
     }
@@ -89,4 +93,75 @@ function redactSensitiveFields(obj: Record<string, unknown>, keys: string[]) {
       redactSensitiveFields(obj[key] as Record<string, unknown>, keys);
     }
   }
+}
+
+/**
+ * 截断超大对象，防止日志过大
+ * @param obj - 要处理的对象
+ * @param maxBytes - 最大字节数（默认2KB）
+ * @returns 截断后的对象
+ */
+function truncateLargeObject(
+  obj: Record<string, unknown>,
+  maxBytes: number = 2048,
+): Record<string, unknown> | string {
+  const jsonStr = JSON.stringify(obj);
+
+  // 如果对象不大，直接返回
+  if (jsonStr.length <= maxBytes) {
+    return obj;
+  }
+
+  // 对象过大，需要截断
+  const result: Record<string, unknown> = {};
+  let currentSize = 0;
+
+  for (const [key, value] of Object.entries(obj)) {
+    // 特殊处理数组：只保留部分元素
+    if (Array.isArray(value)) {
+      if (value.length > 10) {
+        result[key] = [
+          ...value.slice(0, 3),
+          `...[${value.length - 5} items omitted]...`,
+          ...value.slice(-2),
+        ];
+      } else if (value.length > 5) {
+        result[key] = [
+          ...value.slice(0, 3),
+          `...[${value.length - 3} items omitted]...`,
+        ];
+      } else {
+        result[key] = value;
+      }
+    }
+    // 特殊处理嵌套对象：只保留摘要
+    else if (
+      typeof value === 'object' &&
+      value !== null &&
+      !Array.isArray(value)
+    ) {
+      const nestedKeys = Object.keys(value);
+      if (nestedKeys.length > 5) {
+        result[key] = {
+          _summary: `Object with ${nestedKeys.length} keys: ${nestedKeys.slice(0, 3).join(', ')}...`,
+        };
+      } else {
+        result[key] = value;
+      }
+    }
+    // 其他类型直接保留
+    else {
+      result[key] = value;
+    }
+
+    // 检查当前大小
+    currentSize = JSON.stringify(result).length;
+    if (currentSize > maxBytes) {
+      result._truncated = true;
+      result._message = `Response too large (${jsonStr.length} bytes), showing summary only`;
+      break;
+    }
+  }
+
+  return result;
 }
