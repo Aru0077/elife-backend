@@ -26,6 +26,11 @@ export class HttpLoggingService implements OnModuleInit {
         // @ts-expect-error - 添加自定义 metadata 字段
         config.metadata = { startTime: Date.now() };
 
+        // 过滤掉发往 CLS 的请求，避免"日志的日志"循环
+        if (config.url?.includes('cls.tencentyun.com')) {
+          return config;
+        }
+
         const logData = {
           type: 'outbound',
           stage: 'request',
@@ -65,6 +70,11 @@ export class HttpLoggingService implements OnModuleInit {
           | undefined;
         const startTime = metadata?.startTime;
         const duration = startTime ? Date.now() - startTime : 0;
+
+        // 过滤掉发往 CLS 的响应，避免"日志的日志"循环
+        if (response.config.url?.includes('cls.tencentyun.com')) {
+          return response;
+        }
 
         const logData = {
           type: 'outbound',

@@ -13,10 +13,12 @@ async function bootstrap() {
         ? new ConsoleLogger({
             json: true,
             colors: false,
+            logLevels: ['error', 'warn', 'log'], // 生产环境只输出 error/warn/log，不输出 debug/verbose
           })
         : new ConsoleLogger({
             json: false,
             colors: true,
+            logLevels: ['error', 'warn', 'log', 'debug'], // 开发环境包含 debug
           }),
   });
 

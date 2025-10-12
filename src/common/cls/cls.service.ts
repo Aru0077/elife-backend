@@ -142,8 +142,7 @@ export class ClsService {
       // 上传日志
       await this.client.PutLogs(request);
 
-      // 使用 debug 级别，避免"日志的日志"干扰
-      this.logger.debug(`成功上传 ${logsToUpload.length} 条日志到CLS`);
+      // 上传成功不记录日志，避免"日志的日志"干扰
     } catch (error) {
       const err = error as Error;
       this.logger.error('上传日志到CLS失败', {
