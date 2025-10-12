@@ -22,19 +22,6 @@ export class WechatAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
 
-    // 开发环境降级逻辑：支持通过 X-Mock-Openid Header 模拟用户
-    if (process.env.NODE_ENV === 'development') {
-      const mockOpenid = request.headers['x-mock-openid'];
-      if (mockOpenid) {
-        this.logger.debug(`使用 Mock 用户: ${String(mockOpenid)}`);
-        const user = await this.userService.findOrCreate({
-          openid: String(mockOpenid),
-        });
-        request.user = user;
-        return true;
-      }
-    }
-
     // 1. 验证请求来自微信生态
     const source = request.headers['x-wx-source'];
     if (!source) {

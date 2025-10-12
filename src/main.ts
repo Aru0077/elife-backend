@@ -18,7 +18,7 @@ async function bootstrap() {
         : new ConsoleLogger({
             json: false,
             colors: true,
-            logLevels: ['error', 'warn', 'log', 'debug'], // 开发环境包含 debug
+            logLevels: ['error', 'warn', 'log'], // 所有环境统一：不输出 debug/verbose
           }),
   });
 
@@ -67,7 +67,6 @@ async function bootstrap() {
     allowedHeaders: [
       'Content-Type',
       'Authorization',
-      'X-Mock-Openid', // 开发环境 Mock openid 头
       'X-WX-OPENID', // 微信 openid 头
       'X-WX-APPID', // 微信 appid 头
       'X-WX-UNIONID', // 微信 unionid 头
