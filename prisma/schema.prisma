@@ -64,3 +64,16 @@ model Order {
   @@index([rechargeStatus, paidAt])
   @@map("orders")
 }
+
+// 汇率配置表
+model ExchangeRate {
+  id        Int      @id @default(autoincrement())
+  currency  String   @unique @db.VarChar(20)  // 货币对，例如 "MNT_TO_CNY"
+  rate      Decimal  @db.Decimal(10, 4)       // 汇率值，例如 440.0000
+  isActive  Boolean  @default(true) @map("is_active")  // 是否启用
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@map("exchange_rates")
+}

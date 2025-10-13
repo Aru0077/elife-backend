@@ -16,6 +16,7 @@ import { OrderModule } from './modules/order/order.module';
 import { UnitelModule } from './modules/unitel/unitel.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { ProductModule } from './modules/product/product.module';
+import { ExchangeRateModule } from './modules/exchange-rate/exchange-rate.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { ProductModule } from './modules/product/product.module';
     PaymentModule,
     StatisticsModule,
     UnitelModule,
+    ExchangeRateModule,
   ],
 })
 export class AppModule implements NestModule {

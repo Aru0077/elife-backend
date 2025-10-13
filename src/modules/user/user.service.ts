@@ -59,13 +59,4 @@ export class UserService {
       throw error;
     }
   }
-
-  /**
-   * 通过 openid 查找用户
-   */
-  async findByOpenid(openid: string): Promise<User | null> {
-    return await this.prisma.user.findUnique({
-      where: { openid },
-    });
-  }
 }

@@ -16,6 +16,7 @@ export class QueryServiceDto {
 export interface ServiceCard {
   code: string;
   name: string;
+  eng_name?: string;
   price: number;
   unit?: number;
   data?: string;
@@ -27,6 +28,7 @@ export interface ServiceCard {
 export interface DataPackage {
   code: string;
   name: string;
+  eng_name?: string;
   price: number;
   data: string;
   days: number;
@@ -41,6 +43,10 @@ export interface ServiceTypeResponse {
   servicetype?: string;
   productid?: string;
   name?: string;
+  '3rdparty_name'?: string;
+  billtype?: string;
+  service_bill_type?: string;
+  status?: string;
   service?: {
     name: string;
     cards?: {

@@ -28,6 +28,9 @@ export class UnitelService {
     SERVICE_TYPE: '/service/servicetype',
     RECHARGE: '/service/recharge',
     DATA_PACKAGE: '/service/datapackage',
+    // /service/unitel  获取后付费账单
+    // /service/payment 支付后付费账单
+    // /service/check_transaction_result 查询充值结算结果
   };
 
   // HTTP 超时配置（30秒）
