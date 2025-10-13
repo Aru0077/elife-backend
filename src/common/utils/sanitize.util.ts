@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /**
  * 日志数据脱敏工具函数
  * 用于清理 HTTP 日志中的敏感信息

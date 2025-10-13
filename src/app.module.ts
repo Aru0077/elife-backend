@@ -7,16 +7,9 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { GlobalHttpModule } from './common/http/http.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { ClsModule } from './common/cls/cls.module';
-import { WechatModule } from './modules/wechat/wechat.module';
-import { HealthModule } from './modules/health/health.module';
-import { AuthModule } from './modules/auth/auth.module';
-import { UserModule } from './modules/user/user.module';
-import { StatisticsModule } from './modules/statistics/statistics.module';
-import { OrderModule } from './modules/order/order.module';
-import { UnitelModule } from './modules/unitel/unitel.module';
-import { PaymentModule } from './modules/payment/payment.module';
-import { ProductModule } from './modules/product/product.module';
-import { ExchangeRateModule } from './modules/exchange-rate/exchange-rate.module';
+import { CommonModule } from './modules/common/common.module';
+import { WechatMpModule } from './modules/wechat-mp/wechat-mp.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -30,16 +23,9 @@ import { ExchangeRateModule } from './modules/exchange-rate/exchange-rate.module
     GlobalHttpModule,
     PrismaModule,
     ClsModule,
-    WechatModule,
-    HealthModule,
-    AuthModule,
-    UserModule,
-    ProductModule,
-    OrderModule,
-    PaymentModule,
-    StatisticsModule,
-    UnitelModule,
-    ExchangeRateModule,
+    CommonModule,
+    WechatMpModule,
+    AdminModule,
   ],
 })
 export class AppModule implements NestModule {
