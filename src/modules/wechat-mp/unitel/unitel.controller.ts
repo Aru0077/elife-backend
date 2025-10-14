@@ -1,7 +1,11 @@
 import { Controller, Post, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { UnitelService } from './unitel.service';
-import { QueryServiceDto, GetPostpaidBillDto } from './dto';
+import {
+  QueryServiceDto,
+  GetPostpaidBillDto,
+  GetPostpaidBillResponse,
+} from './dto';
 
 /**
  * Unitel API Controller
@@ -29,7 +33,9 @@ export class UnitelController {
    */
   @Post('postpaid-bill')
   @ApiOperation({ summary: '获取 Unitel 后付费账单' })
-  async getPostpaidBill(@Body() dto: GetPostpaidBillDto) {
+  async getPostpaidBill(
+    @Body() dto: GetPostpaidBillDto,
+  ): Promise<GetPostpaidBillResponse> {
     return await this.unitelService.getPostpaidBill(dto);
   }
 }

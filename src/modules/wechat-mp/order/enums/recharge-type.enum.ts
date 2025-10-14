@@ -7,4 +7,7 @@ export enum RechargeType {
 
   /** 流量充值 */
   DATA = 'data',
+
+  /** 账单结算 */
+  POSTPAID = 'postpaid',
 }

@@ -9,6 +9,21 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
+/**
+ * 获取后付费账单 DTO
+ */
+export class GetPostpaidBillDto {
+  @ApiProperty({ description: '账户所有者', example: '88051269' })
+  @IsNotEmpty({ message: '账户所有者不能为空' })
+  @IsString({ message: '账户所有者必须是字符串' })
+  owner!: string;
+
+  @ApiProperty({ description: '手机号码', example: '88051269' })
+  @IsNotEmpty({ message: '手机号码不能为空' })
+  @IsString({ message: '手机号码必须是字符串' })
+  msisdn!: string;
+}
+
 // 交易信息 (复用 recharge.dto 中的结构)
 export class PostpaidTransactionDto {
   @ApiProperty({ description: '交易ID', example: 'TXN20231001001' })
@@ -30,21 +45,6 @@ export class PostpaidTransactionDto {
   @IsNotEmpty({ message: '账户不能为空' })
   @IsString({ message: '账户必须是字符串' })
   account!: string;
-}
-
-/**
- * 获取后付费账单 DTO
- */
-export class GetPostpaidBillDto {
-  @ApiProperty({ description: '账户所有者', example: '88051269' })
-  @IsNotEmpty({ message: '账户所有者不能为空' })
-  @IsString({ message: '账户所有者必须是字符串' })
-  owner!: string;
-
-  @ApiProperty({ description: '手机号码', example: '88051269' })
-  @IsNotEmpty({ message: '手机号码不能为空' })
-  @IsString({ message: '手机号码必须是字符串' })
-  msisdn!: string;
 }
 
 /**
@@ -121,8 +121,13 @@ export interface GetPostpaidBillResponse {
   result: string;
   code: string;
   msg: string;
-  bill?: PostpaidBillDetail;
-  bills?: PostpaidBillDetail[]; // 可能返回多个账单
+  invoice_amount?: number; // 发票金额
+  remain_amount?: number; // 剩余金额
+  invoice_date?: string; // 发票日期
+  broadcast_fee?: string; // 广播费
+  total_unpaid?: number; // 总欠费
+  invoice_unpaid?: number; // 发票欠费
+  invoice_status?: string; // 发票状态：paid, unpaid 等
   [key: string]: unknown; // 允许其他未知字段
 }
 
