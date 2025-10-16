@@ -1,0 +1,246 @@
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Order } from '@prisma/client';
+import { UnitelService } from '@modules/wechat-mp/unitel/unitel.service';
+import {
+  ServiceTypeResponse,
+  ServiceCard,
+  DataPackage,
+} from '@modules/wechat-mp/unitel/dto';
+import { Operator, RechargeType } from '../enums';
+import {
+  OperatorAdapter,
+  ProductInfo,
+  RechargeResult,
+  PostpaidBillInfo,
+} from './operator-adapter.interface';
+
+/**
+ * Unitel 运营商适配器
+ * 封装 Unitel 特定的业务逻辑
+ */
+@Injectable()
+export class UnitelAdapter implements OperatorAdapter {
+  private readonly logger = new Logger(UnitelAdapter.name);
+
+  constructor(private readonly unitelService: UnitelService) {}
+
+  /**
+   * 获取运营商名称
+   */
+  getOperatorName(): Operator {
+    return Operator.UNITEL;
+  }
+
+  /**
+   * 验证商品并获取商品详情
+   */
+  async validateAndGetProduct(
+    productCode: string,
+    phoneNumber: string,
+    rechargeType: string,
+  ): Promise<ProductInfo> {
+    try {
+      // 调用 Unitel API 获取最新资费列表
+      this.logger.log({
+        message: 'Unitel 获取资费列表',
+        msisdn: phoneNumber,
+        productCode,
+        rechargeType,
+      });
+
+      const serviceData = await this.unitelService.getServiceTypes({
+        msisdn: phoneNumber,
+        info: '1', // 获取详细资费信息
+      });
+
+      // 从资费列表中查找商品
+      const product = this.findProductByCode(serviceData, productCode);
+
+      if (!product) {
+        throw new BadRequestException(`商品代码 ${productCode} 不存在或已下架`);
+      }
+
+      // 转换为统一的 ProductInfo 格式
+      // 优先使用英文名称，回退到本地名称
+      const productInfo: ProductInfo = {
+        code: product.code,
+        name: product.eng_name || product.name,
+        engName: product.eng_name,
+        price: product.price,
+        unit:
+          'unit' in product && product.unit
+            ? product.unit.toString()
+            : undefined,
+        data: product.data,
+        days: product.days,
+      };
+
+      this.logger.log({
+        message: 'Unitel 商品信息获取成功',
+        productCode,
+        productName: productInfo.name,
+        engName: productInfo.engName,
+        price: productInfo.price,
+      });
+
+      return productInfo;
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error('Unitel 获取商品信息失败', {
+        message: err.message,
+        stack: err.stack,
+        productCode,
+        phoneNumber,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * 执行充值操作
+   */
+  async recharge(order: Order): Promise<RechargeResult> {
+    try {
+      let result;
+
+      if (order.productRechargeType === (RechargeType.DATA as string)) {
+        // 流量包激活
+        const dataPackageDto = {
+          msisdn: order.phoneNumber,
+          package: order.productCode,
+          vatflag: '0', // 暂不开发票
+          transactions: [
+            {
+              journal_id: order.orderNumber,
+              amount: order.productPriceTg.toString(),
+              description: 'Data Package',
+              account: 'WECHAT',
+            },
+          ],
+        };
+
+        this.logger.log({
+          message: 'Unitel 调用流量包激活 API',
+          orderNumber: order.orderNumber,
+          msisdn: order.phoneNumber,
+          package: order.productCode,
+          amount: order.productPriceTg.toString(),
+        });
+
+        result = await this.unitelService.activateDataPackage(dataPackageDto);
+      } else {
+        // 话费充值
+        const rechargeDto = {
+          msisdn: order.phoneNumber,
+          card: order.productCode,
+          vatflag: '0', // 暂不开发票
+          transactions: [
+            {
+              journal_id: order.orderNumber,
+              amount: order.productPriceTg.toString(),
+              description: 'Recharge',
+              account: 'WECHAT',
+            },
+          ],
+        };
+
+        this.logger.log({
+          message: 'Unitel 调用话费充值 API',
+          orderNumber: order.orderNumber,
+          msisdn: order.phoneNumber,
+          card: order.productCode,
+          amount: order.productPriceTg.toString(),
+        });
+
+        result = await this.unitelService.recharge(rechargeDto);
+      }
+
+      // 转换为统一的充值结果格式
+      const rechargeResult: RechargeResult = {
+        result: result.result === 'success' ? 'success' : 'failed',
+        code: result.code,
+        msg: result.msg,
+      };
+
+      this.logger.log({
+        message: `Unitel 充值${rechargeResult.result === 'success' ? '成功' : '失败'}`,
+        orderNumber: order.orderNumber,
+        result: rechargeResult.result,
+        code: rechargeResult.code,
+        msg: rechargeResult.msg,
+      });
+
+      return rechargeResult;
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error('Unitel 充值异常', {
+        message: err.message,
+        stack: err.stack,
+        orderNumber: order.orderNumber,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * 获取后付费账单信息
+   */
+  async getPostpaidBill(phoneNumber: string): Promise<PostpaidBillInfo> {
+    try {
+      this.logger.log({
+        message: 'Unitel 获取后付费账单',
+        phoneNumber,
+      });
+
+      const billData = await this.unitelService.getPostpaidBill({
+        owner: phoneNumber,
+        msisdn: phoneNumber,
+      });
+
+      // 转换为统一的账单信息格式
+      const billInfo: PostpaidBillInfo = {
+        totalUnpaid: billData.total_unpaid || 0,
+        invoiceStatus: billData.invoice_status,
+        invoiceAmount: billData.invoice_amount,
+        invoiceDate: billData.invoice_date,
+      };
+
+      this.logger.log({
+        message: 'Unitel 账单信息获取成功',
+        phoneNumber,
+        totalUnpaid: billInfo.totalUnpaid,
+        invoiceStatus: billInfo.invoiceStatus,
+      });
+
+      return billInfo;
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error('Unitel 获取账单信息失败', {
+        message: err.message,
+        stack: err.stack,
+        phoneNumber,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * 从资费列表中查找商品（私有方法）
+   */
+  private findProductByCode(
+    serviceData: ServiceTypeResponse,
+    productCode: string,
+  ): ServiceCard | DataPackage | undefined {
+    // 合并所有可能的商品列表
+    const allProducts: (ServiceCard | DataPackage)[] = [
+      ...(serviceData.service?.cards?.day || []),
+      ...(serviceData.service?.cards?.noday || []),
+      ...(serviceData.service?.cards?.special || []),
+      ...(serviceData.service?.data?.data || []),
+      ...(serviceData.service?.data?.days || []),
+      ...(serviceData.service?.data?.entertainment || []),
+    ];
+
+    return allProducts.find((p) => p.code === productCode);
+  }
+}

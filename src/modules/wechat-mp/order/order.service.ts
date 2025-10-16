@@ -5,7 +5,6 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '@common/prisma/prisma.service';
-import { UnitelService } from '@modules/wechat-mp/unitel/unitel.service';
 import { ExchangeRateService } from '@modules/common/exchange-rate/exchange-rate.service';
 import {
   QueryOrderDto,
@@ -13,24 +12,29 @@ import {
   CreateDataPackageOrderDto,
   CreatePostpaidBillOrderDto,
 } from './dto';
-import { PaymentStatus, RechargeStatus, RechargeType } from './enums';
+import { PaymentStatus, RechargeStatus, RechargeType, Operator } from './enums';
 import { nanoid } from 'nanoid';
 import { Prisma } from '@prisma/client';
-import {
-  ServiceTypeResponse,
-  ServiceCard,
-  DataPackage,
-} from '@modules/wechat-mp/unitel/dto';
+import { OperatorAdapter } from './adapters';
+import { UnitelAdapter } from './adapters';
 
 @Injectable()
 export class OrderService {
   private readonly logger = new Logger(OrderService.name);
+  private readonly adapters: Map<Operator, OperatorAdapter>;
 
   constructor(
     private prisma: PrismaService,
-    private unitelService: UnitelService,
+    private readonly unitelAdapter: UnitelAdapter,
     private exchangeRateService: ExchangeRateService,
-  ) {}
+  ) {
+    // 初始化运营商适配器映射
+    this.adapters = new Map([
+      [Operator.UNITEL, this.unitelAdapter],
+      // 未来可以添加更多运营商适配器
+      // [Operator.MOBICOM, mobicomAdapter],
+    ]);
+  }
 
   /**
    * 生成订单号
@@ -42,78 +46,14 @@ export class OrderService {
   }
 
   /**
-   * 从资费列表中查找商品
+   * 获取运营商适配器
    */
-  private findProductByCode(
-    serviceData: ServiceTypeResponse,
-    productCode: string,
-  ): ServiceCard | DataPackage | undefined {
-    // 合并所有可能的商品列表
-    const allProducts: (ServiceCard | DataPackage)[] = [
-      ...(serviceData.service?.cards?.day || []),
-      ...(serviceData.service?.cards?.noday || []),
-      ...(serviceData.service?.cards?.special || []),
-      ...(serviceData.service?.data?.data || []),
-      ...(serviceData.service?.data?.days || []),
-      ...(serviceData.service?.data?.entertainment || []),
-    ];
-
-    return allProducts.find((p) => p.code === productCode);
-  }
-
-  /**
-   * 查询订单详情
-   */
-  async findOne(
-    orderNumber: string,
-    openid?: string,
-  ): Promise<
-    Prisma.OrderGetPayload<{
-      include: {
-        user: {
-          select: {
-            openid: true;
-            appid: true;
-            createdAt: true;
-          };
-        };
-      };
-    }>
-  > {
-    try {
-      const whereClause: Prisma.OrderWhereUniqueInput = { orderNumber };
-
-      const order = await this.prisma.order.findUnique({
-        where: whereClause,
-        include: {
-          user: {
-            select: {
-              openid: true,
-              appid: true,
-              createdAt: true,
-            },
-          },
-        },
-      });
-
-      if (!order) {
-        throw new NotFoundException('订单不存在');
-      }
-
-      // 如果指定了 openid，验证订单所有权
-      if (openid && order.openid !== openid) {
-        throw new NotFoundException('订单不存在');
-      }
-
-      return order;
-    } catch (error) {
-      const err = error as Error;
-      this.logger.error(`查询订单失败: ${orderNumber}`, {
-        message: err.message,
-        stack: err.stack,
-      });
-      throw error;
+  private getAdapter(operator: Operator): OperatorAdapter {
+    const adapter = this.adapters.get(operator);
+    if (!adapter) {
+      throw new BadRequestException(`不支持的运营商: ${operator}`);
     }
+    return adapter;
   }
 
   /**
@@ -178,6 +118,60 @@ export class OrderService {
     } catch (error) {
       const err = error as Error;
       this.logger.error(`查询用户订单列表失败: ${openid}`, {
+        message: err.message,
+        stack: err.stack,
+      });
+      throw error;
+    }
+  }
+  /**
+   * 查询订单详情
+   */
+  async findOne(
+    orderNumber: string,
+    openid?: string,
+  ): Promise<
+    Prisma.OrderGetPayload<{
+      include: {
+        user: {
+          select: {
+            openid: true;
+            appid: true;
+            createdAt: true;
+          };
+        };
+      };
+    }>
+  > {
+    try {
+      const whereClause: Prisma.OrderWhereUniqueInput = { orderNumber };
+
+      const order = await this.prisma.order.findUnique({
+        where: whereClause,
+        include: {
+          user: {
+            select: {
+              openid: true,
+              appid: true,
+              createdAt: true,
+            },
+          },
+        },
+      });
+
+      if (!order) {
+        throw new NotFoundException('订单不存在');
+      }
+
+      // 如果指定了 openid，验证订单所有权
+      if (openid && order.openid !== openid) {
+        throw new NotFoundException('订单不存在');
+      }
+
+      return order;
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(`查询订单失败: ${orderNumber}`, {
         message: err.message,
         stack: err.stack,
       });
@@ -281,57 +275,19 @@ export class OrderService {
         },
       });
 
-      // 4. 根据充值类型调用不同的 Unitel API
-      let result;
-      if (order.productRechargeType === (RechargeType.DATA as string)) {
-        // 流量包激活
-        const dataPackageDto = {
-          msisdn: order.phoneNumber,
-          package: order.productCode,
-          vatflag: '0', // 暂不开发票
-          transactions: [
-            {
-              journal_id: orderNumber,
-              amount: order.productPriceTg.toString(),
-              description: 'Data Package',
-              account: 'WECHAT',
-            },
-          ],
-        };
+      // 4. 获取运营商适配器并执行充值
+      const adapter = this.getAdapter(order.productOperator as Operator);
 
-        this.logger.log({
-          message: '调用流量包激活 API',
-          orderNumber,
-          msisdn: order.phoneNumber,
-          package: order.productCode,
-          amount: order.productPriceTg.toString(),
-        });
-        result = await this.unitelService.activateDataPackage(dataPackageDto);
-      } else {
-        // 话费充值
-        const rechargeDto = {
-          msisdn: order.phoneNumber,
-          card: order.productCode,
-          vatflag: '0', // 暂不开发票
-          transactions: [
-            {
-              journal_id: orderNumber,
-              amount: order.productPriceTg.toString(),
-              description: 'Recharge',
-              account: 'WECHAT',
-            },
-          ],
-        };
+      this.logger.log({
+        message: '开始执行充值',
+        orderNumber,
+        operator: order.productOperator,
+        phoneNumber: order.phoneNumber,
+        productCode: order.productCode,
+        rechargeType: order.productRechargeType,
+      });
 
-        this.logger.log({
-          message: '调用话费充值 API',
-          orderNumber,
-          msisdn: order.phoneNumber,
-          card: order.productCode,
-          amount: order.productPriceTg.toString(),
-        });
-        result = await this.unitelService.recharge(rechargeDto);
-      }
+      const result = await adapter.recharge(order);
 
       // 5. 根据充值结果更新订单状态
       const isSuccess = result.result === 'success';
@@ -347,6 +303,7 @@ export class OrderService {
       this.logger.log({
         message: `订单充值${isSuccess ? '成功' : '失败'}`,
         orderNumber,
+        operator: order.productOperator,
         rechargeStatus: isSuccess ? 'success' : 'failed',
         apiResult: result.result,
         apiCode: result.code,
@@ -393,26 +350,22 @@ export class OrderService {
         throw new BadRequestException('用户不存在');
       }
 
-      // 2. 调用 Unitel API 获取最新资费列表
+      // 2. 获取运营商适配器
+      const adapter = this.getAdapter(dto.productOperator);
+
+      // 3. 通过适配器验证商品并获取商品信息
       this.logger.log({
-        message: '获取最新资费列表',
-        msisdn: dto.phoneNumber,
+        message: '获取商品信息',
+        operator: dto.productOperator,
+        phoneNumber: dto.phoneNumber,
         productCode: dto.productCode,
       });
 
-      const serviceData = await this.unitelService.getServiceTypes({
-        msisdn: dto.phoneNumber,
-        info: '1', // 获取详细资费信息
-      });
-
-      // 3. 从资费列表中查找对应商品
-      const product = this.findProductByCode(serviceData, dto.productCode);
-
-      if (!product) {
-        throw new BadRequestException(
-          `商品代码 ${dto.productCode} 不存在或已下架`,
-        );
-      }
+      const product = await adapter.validateAndGetProduct(
+        dto.productCode,
+        dto.phoneNumber,
+        RechargeType.VOICE,
+      );
 
       // 4. 获取当前汇率并计算人民币价格
       const exchangeRate =
@@ -422,8 +375,10 @@ export class OrderService {
 
       this.logger.log({
         message: '商品信息获取成功',
+        operator: dto.productOperator,
         productCode: dto.productCode,
         productName: product.name,
+        productEngName: product.engName,
         priceTg,
         priceRmb,
         exchangeRate: exchangeRate.rate,
@@ -439,14 +394,11 @@ export class OrderService {
           phoneNumber: dto.phoneNumber,
           productOperator: dto.productOperator,
           productRechargeType: RechargeType.VOICE,
-          productName: product.name,
+          productName: product.name, // 使用 eng_name || name
           productCode: product.code,
           productPriceTg: priceTg,
           productPriceRmb: priceRmb,
-          productUnit:
-            'unit' in product && product.unit
-              ? product.unit.toString()
-              : undefined,
+          productUnit: product.unit,
           productData: product.data,
           productDays: product.days,
         },
@@ -482,26 +434,22 @@ export class OrderService {
         throw new BadRequestException('用户不存在');
       }
 
-      // 2. 调用 Unitel API 获取最新资费列表
+      // 2. 获取运营商适配器
+      const adapter = this.getAdapter(dto.productOperator);
+
+      // 3. 通过适配器验证商品并获取商品信息
       this.logger.log({
-        message: '获取最新资费列表',
-        msisdn: dto.phoneNumber,
+        message: '获取商品信息',
+        operator: dto.productOperator,
+        phoneNumber: dto.phoneNumber,
         productCode: dto.productCode,
       });
 
-      const serviceData = await this.unitelService.getServiceTypes({
-        msisdn: dto.phoneNumber,
-        info: '1', // 获取详细资费信息
-      });
-
-      // 3. 从资费列表中查找对应商品
-      const product = this.findProductByCode(serviceData, dto.productCode);
-
-      if (!product) {
-        throw new BadRequestException(
-          `商品代码 ${dto.productCode} 不存在或已下架`,
-        );
-      }
+      const product = await adapter.validateAndGetProduct(
+        dto.productCode,
+        dto.phoneNumber,
+        RechargeType.DATA,
+      );
 
       // 4. 获取当前汇率并计算人民币价格
       const exchangeRate =
@@ -511,8 +459,10 @@ export class OrderService {
 
       this.logger.log({
         message: '商品信息获取成功',
+        operator: dto.productOperator,
         productCode: dto.productCode,
         productName: product.name,
+        productEngName: product.engName,
         priceTg,
         priceRmb,
         exchangeRate: exchangeRate.rate,
@@ -528,14 +478,11 @@ export class OrderService {
           phoneNumber: dto.phoneNumber,
           productOperator: dto.productOperator,
           productRechargeType: RechargeType.DATA,
-          productName: product.name,
+          productName: product.name, // 使用 eng_name || name
           productCode: product.code,
           productPriceTg: priceTg,
           productPriceRmb: priceRmb,
-          productUnit:
-            'unit' in product && product.unit
-              ? product.unit.toString()
-              : undefined,
+          productUnit: product.unit,
           productData: product.data,
           productDays: product.days,
         },
@@ -571,40 +518,42 @@ export class OrderService {
         throw new BadRequestException('用户不存在');
       }
 
-      // 2. 调用 Unitel API 获取后付费账单
+      // 2. 获取运营商适配器
+      const adapter = this.getAdapter(dto.productOperator);
+
+      // 3. 通过适配器获取后付费账单
       this.logger.log({
         message: '获取后付费账单',
-        msisdn: dto.phoneNumber,
+        operator: dto.productOperator,
+        phoneNumber: dto.phoneNumber,
       });
 
-      const billData = await this.unitelService.getPostpaidBill({
-        owner: dto.phoneNumber,
-        msisdn: dto.phoneNumber,
-      });
+      const billInfo = await adapter.getPostpaidBill!(dto.phoneNumber);
 
-      // 3. 验证账单状态
-      if (billData.invoice_status === 'paid') {
+      // 4. 验证账单状态
+      if (billInfo.invoiceStatus === 'paid') {
         throw new BadRequestException('账单已结清，无需支付');
       }
 
-      if (!billData.total_unpaid || billData.total_unpaid <= 0) {
+      if (!billInfo.totalUnpaid || billInfo.totalUnpaid <= 0) {
         throw new BadRequestException('无欠费账单');
       }
 
-      // 4. 获取当前汇率并计算人民币价格
+      // 5. 获取当前汇率并计算人民币价格
       const exchangeRate =
         await this.exchangeRateService.getCurrentRate('MNT_TO_CNY');
-      const priceTg = billData.total_unpaid;
+      const priceTg = billInfo.totalUnpaid;
       const priceRmb = Number((priceTg / exchangeRate.rate).toFixed(2));
 
       this.logger.log({
         message: '账单信息获取成功',
+        operator: dto.productOperator,
         priceTg,
         priceRmb,
         exchangeRate: exchangeRate.rate,
       });
 
-      // 5. 生成订单号并创建订单
+      // 6. 生成订单号并创建订单
       const orderNumber = this.generateOrderNumber();
 
       const order = await this.prisma.order.create({
@@ -614,14 +563,14 @@ export class OrderService {
           phoneNumber: dto.phoneNumber,
           productOperator: dto.productOperator,
           productRechargeType: RechargeType.POSTPAID,
-          productName: '后付费账单结算',
+          productName: 'Postpaid Bill Payment', // 英文账单名称
           productCode: 'POSTPAID_BILL',
           productPriceTg: priceTg,
           productPriceRmb: priceRmb,
           productData: JSON.stringify({
-            invoice_amount: billData.invoice_amount,
-            invoice_date: billData.invoice_date,
-            invoice_status: billData.invoice_status,
+            invoice_amount: billInfo.invoiceAmount,
+            invoice_date: billInfo.invoiceDate,
+            invoice_status: billInfo.invoiceStatus,
           }),
         },
       });

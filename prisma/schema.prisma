@@ -57,11 +57,12 @@ model Order {
   // 关联
   user           User      @relation(fields: [openid], references: [openid])
 
+  // 索引优化
   @@index([openid])
-  @@index([paymentStatus])
-  @@index([rechargeStatus])
+  @@index([phoneNumber])
+  @@index([productOperator, productRechargeType])
+  @@index([paymentStatus, rechargeStatus, paidAt])
   @@index([createdAt])
-  @@index([rechargeStatus, paidAt])
   @@map("orders")
 }
 
