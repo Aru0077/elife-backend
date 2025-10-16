@@ -12,7 +12,12 @@ import { OrderService } from './order.service';
 import { WechatAuthGuard } from '@modules/wechat-mp/auth/guards/wechat-auth.guard';
 import { CurrentUser } from '@modules/wechat-mp/auth/decorators/current-user.decorator';
 import { User, Prisma } from '@prisma/client';
-import { CreateOrderDto, QueryOrderDto } from './dto';
+import {
+  QueryOrderDto,
+  CreatePrepaidRechargeOrderDto,
+  CreateDataPackageOrderDto,
+  CreatePostpaidBillOrderDto,
+} from './dto';
 
 /**
  * 订单 Controller
@@ -24,18 +29,6 @@ import { CreateOrderDto, QueryOrderDto } from './dto';
 @ApiBearerAuth()
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
-
-  /**
-   * 创建订单
-   */
-  @Post()
-  @ApiOperation({ summary: '创建订单' })
-  async create(
-    @CurrentUser() user: User,
-    @Body() createOrderDto: CreateOrderDto,
-  ): Promise<Prisma.OrderGetPayload<object>> {
-    return await this.orderService.create(user.openid, createOrderDto);
-  }
 
   /**
    * 查询我的订单列表
@@ -68,5 +61,41 @@ export class OrderController {
     }>
   > {
     return await this.orderService.findOne(orderNumber, user.openid);
+  }
+
+  /**
+   * 创建话费充值订单（安全版本）
+   */
+  @Post('prepaid/recharge')
+  @ApiOperation({ summary: '创建话费充值订单' })
+  async createPrepaidRecharge(
+    @CurrentUser() user: User,
+    @Body() dto: CreatePrepaidRechargeOrderDto,
+  ): Promise<Prisma.OrderGetPayload<object>> {
+    return await this.orderService.createPrepaidRechargeOrder(user.openid, dto);
+  }
+
+  /**
+   * 创建流量包订单（安全版本）
+   */
+  @Post('prepaid/data-package')
+  @ApiOperation({ summary: '创建流量包订单' })
+  async createDataPackage(
+    @CurrentUser() user: User,
+    @Body() dto: CreateDataPackageOrderDto,
+  ): Promise<Prisma.OrderGetPayload<object>> {
+    return await this.orderService.createDataPackageOrder(user.openid, dto);
+  }
+
+  /**
+   * 创建账单结算订单（安全版本）
+   */
+  @Post('postpaid/bill-payment')
+  @ApiOperation({ summary: '创建账单结算订单' })
+  async createPostpaidBill(
+    @CurrentUser() user: User,
+    @Body() dto: CreatePostpaidBillOrderDto,
+  ): Promise<Prisma.OrderGetPayload<object>> {
+    return await this.orderService.createPostpaidBillOrder(user.openid, dto);
   }
 }
