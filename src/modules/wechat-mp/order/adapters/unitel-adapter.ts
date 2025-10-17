@@ -129,7 +129,9 @@ export class UnitelAdapter implements OperatorAdapter {
           vatflag: '0',
           transactions,
         });
-      } else if (order.productRechargeType === (RechargeType.POSTPAID as string)) {
+      } else if (
+        order.productRechargeType === (RechargeType.POSTPAID as string)
+      ) {
         // 后付费账单支付
         this.logger.log({
           message: 'Unitel 调用后付费账单支付 API',

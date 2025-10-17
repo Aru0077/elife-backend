@@ -10,8 +10,7 @@ import { QueryOrderDto, CreateOrderDto } from './dto';
 import { PaymentStatus, RechargeStatus, RechargeType, Operator } from './enums';
 import { nanoid } from 'nanoid';
 import { Prisma } from '@prisma/client';
-import { OperatorAdapter } from './adapters';
-import { UnitelAdapter } from './adapters';
+import { OperatorAdapter, UnitelAdapter } from './adapters';
 
 @Injectable()
 export class OrderService {
@@ -175,6 +174,152 @@ export class OrderService {
   }
 
   /**
+   * 创建订单（统一接口）
+   * 支持话费充值、流量包、账单结算
+   */
+  async createOrder(openid: string, dto: CreateOrderDto) {
+    try {
+      // 1. 验证用户是否存在
+      const user = await this.prisma.user.findUnique({
+        where: { openid },
+      });
+
+      if (!user) {
+        throw new BadRequestException('用户不存在');
+      }
+
+      // 2. 获取运营商适配器
+      const adapter = this.getAdapter(dto.productOperator);
+
+      let productCode: string;
+      let productName: string;
+      let priceTg: number;
+      let productUnit: string | undefined;
+      let productData: string | undefined;
+      let productDays: number | undefined;
+
+      // 3. 根据充值类型获取商品信息
+      if (dto.rechargeType === RechargeType.POSTPAID) {
+        // 后付费：查询账单
+        this.logger.log({
+          message: '获取后付费账单',
+          operator: dto.productOperator,
+          phoneNumber: dto.phoneNumber,
+        });
+
+        const billInfo = await adapter.getPostpaidBill!(dto.phoneNumber);
+
+        // 验证账单状态
+        if (billInfo.invoiceStatus === 'paid') {
+          throw new BadRequestException('账单已结清，无需支付');
+        }
+
+        if (!billInfo.totalUnpaid || billInfo.totalUnpaid <= 0) {
+          throw new BadRequestException('无欠费账单');
+        }
+
+        productCode = 'POSTPAID_BILL';
+        productName = 'Bill Payment';
+        priceTg = billInfo.totalUnpaid;
+        productData = JSON.stringify({
+          invoice_amount: billInfo.invoiceAmount,
+          invoice_date: billInfo.invoiceDate,
+          invoice_status: billInfo.invoiceStatus,
+        });
+
+        this.logger.log({
+          message: '账单信息获取成功',
+          operator: dto.productOperator,
+          totalUnpaid: priceTg,
+        });
+      } else {
+        // 预付费：验证商品
+        if (!dto.productCode) {
+          throw new BadRequestException('预付费订单必须提供商品代码');
+        }
+
+        this.logger.log({
+          message: '获取商品信息',
+          operator: dto.productOperator,
+          phoneNumber: dto.phoneNumber,
+          productCode: dto.productCode,
+          rechargeType: dto.rechargeType,
+        });
+
+        const product = await adapter.validateAndGetProduct(
+          dto.productCode,
+          dto.phoneNumber,
+          dto.rechargeType,
+        );
+
+        productCode = product.code;
+        productName = product.name;
+        priceTg = product.price;
+        productUnit = product.unit;
+        productData = product.data;
+        productDays = product.days;
+
+        this.logger.log({
+          message: '商品信息获取成功',
+          operator: dto.productOperator,
+          productCode,
+          productName,
+          priceTg,
+        });
+      }
+
+      // 4. 获取当前汇率并计算人民币价格
+      const exchangeRate =
+        await this.exchangeRateService.getCurrentRate('MNT_TO_CNY');
+      const priceRmb = Number((priceTg / exchangeRate.rate).toFixed(2));
+
+      this.logger.log({
+        message: '汇率计算完成',
+        priceTg,
+        priceRmb,
+        exchangeRate: exchangeRate.rate,
+      });
+
+      // 5. 生成订单号并创建订单
+      const orderNumber = this.generateOrderNumber();
+
+      const order = await this.prisma.order.create({
+        data: {
+          orderNumber,
+          openid,
+          phoneNumber: dto.phoneNumber,
+          productOperator: dto.productOperator,
+          productRechargeType: dto.rechargeType,
+          productName,
+          productCode,
+          productPriceTg: priceTg,
+          productPriceRmb: priceRmb,
+          productUnit,
+          productData,
+          productDays,
+        },
+      });
+
+      this.logger.log({
+        message: '订单创建成功',
+        orderNumber,
+        openid,
+        rechargeType: dto.rechargeType,
+      });
+
+      return order;
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error('创建订单失败', {
+        message: err.message,
+        stack: err.stack,
+        rechargeType: dto.rechargeType,
+      });
+      throw error;
+    }
+  }
+
+  /**
    * 处理微信支付回调（幂等性保护）
    */
   async handleWechatCallback(orderNumber: string): Promise<void> {
@@ -324,152 +469,6 @@ export class OrderService {
       });
 
       return { status: 'error', error };
-    }
-  }
-
-  /**
-   * 创建订单（统一接口）
-   * 支持话费充值、流量包、账单结算
-   */
-  async createOrder(openid: string, dto: CreateOrderDto) {
-    try {
-      // 1. 验证用户是否存在
-      const user = await this.prisma.user.findUnique({
-        where: { openid },
-      });
-
-      if (!user) {
-        throw new BadRequestException('用户不存在');
-      }
-
-      // 2. 获取运营商适配器
-      const adapter = this.getAdapter(dto.productOperator);
-
-      let productCode: string;
-      let productName: string;
-      let priceTg: number;
-      let productUnit: string | undefined;
-      let productData: string | undefined;
-      let productDays: number | undefined;
-
-      // 3. 根据充值类型获取商品信息
-      if (dto.rechargeType === RechargeType.POSTPAID) {
-        // 后付费：查询账单
-        this.logger.log({
-          message: '获取后付费账单',
-          operator: dto.productOperator,
-          phoneNumber: dto.phoneNumber,
-        });
-
-        const billInfo = await adapter.getPostpaidBill!(dto.phoneNumber);
-
-        // 验证账单状态
-        if (billInfo.invoiceStatus === 'paid') {
-          throw new BadRequestException('账单已结清，无需支付');
-        }
-
-        if (!billInfo.totalUnpaid || billInfo.totalUnpaid <= 0) {
-          throw new BadRequestException('无欠费账单');
-        }
-
-        productCode = 'POSTPAID_BILL';
-        productName = 'Bill Payment';
-        priceTg = billInfo.totalUnpaid;
-        productData = JSON.stringify({
-          invoice_amount: billInfo.invoiceAmount,
-          invoice_date: billInfo.invoiceDate,
-          invoice_status: billInfo.invoiceStatus,
-        });
-
-        this.logger.log({
-          message: '账单信息获取成功',
-          operator: dto.productOperator,
-          totalUnpaid: priceTg,
-        });
-      } else {
-        // 预付费：验证商品
-        if (!dto.productCode) {
-          throw new BadRequestException('预付费订单必须提供商品代码');
-        }
-
-        this.logger.log({
-          message: '获取商品信息',
-          operator: dto.productOperator,
-          phoneNumber: dto.phoneNumber,
-          productCode: dto.productCode,
-          rechargeType: dto.rechargeType,
-        });
-
-        const product = await adapter.validateAndGetProduct(
-          dto.productCode,
-          dto.phoneNumber,
-          dto.rechargeType,
-        );
-
-        productCode = product.code;
-        productName = product.name;
-        priceTg = product.price;
-        productUnit = product.unit;
-        productData = product.data;
-        productDays = product.days;
-
-        this.logger.log({
-          message: '商品信息获取成功',
-          operator: dto.productOperator,
-          productCode,
-          productName,
-          priceTg,
-        });
-      }
-
-      // 4. 获取当前汇率并计算人民币价格
-      const exchangeRate =
-        await this.exchangeRateService.getCurrentRate('MNT_TO_CNY');
-      const priceRmb = Number((priceTg / exchangeRate.rate).toFixed(2));
-
-      this.logger.log({
-        message: '汇率计算完成',
-        priceTg,
-        priceRmb,
-        exchangeRate: exchangeRate.rate,
-      });
-
-      // 5. 生成订单号并创建订单
-      const orderNumber = this.generateOrderNumber();
-
-      const order = await this.prisma.order.create({
-        data: {
-          orderNumber,
-          openid,
-          phoneNumber: dto.phoneNumber,
-          productOperator: dto.productOperator,
-          productRechargeType: dto.rechargeType,
-          productName,
-          productCode,
-          productPriceTg: priceTg,
-          productPriceRmb: priceRmb,
-          productUnit,
-          productData,
-          productDays,
-        },
-      });
-
-      this.logger.log({
-        message: '订单创建成功',
-        orderNumber,
-        openid,
-        rechargeType: dto.rechargeType,
-      });
-
-      return order;
-    } catch (error) {
-      const err = error as Error;
-      this.logger.error('创建订单失败', {
-        message: err.message,
-        stack: err.stack,
-        rechargeType: dto.rechargeType,
-      });
-      throw error;
     }
   }
 }
