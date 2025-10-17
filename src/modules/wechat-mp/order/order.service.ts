@@ -6,12 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '@common/prisma/prisma.service';
 import { ExchangeRateService } from '@modules/common/exchange-rate/exchange-rate.service';
-import {
-  QueryOrderDto,
-  CreatePrepaidRechargeOrderDto,
-  CreateDataPackageOrderDto,
-  CreatePostpaidBillOrderDto,
-} from './dto';
+import { QueryOrderDto, CreateOrderDto } from './dto';
 import { PaymentStatus, RechargeStatus, RechargeType, Operator } from './enums';
 import { nanoid } from 'nanoid';
 import { Prisma } from '@prisma/client';
@@ -333,13 +328,10 @@ export class OrderService {
   }
 
   /**
-   * 创建话费充值订单（VOICE）
-   * 安全性增强：后端获取最新资费并验证价格
+   * 创建订单（统一接口）
+   * 支持话费充值、流量包、账单结算
    */
-  async createPrepaidRechargeOrder(
-    openid: string,
-    dto: CreatePrepaidRechargeOrderDto,
-  ): Promise<Prisma.OrderGetPayload<object>> {
+  async createOrder(openid: string, dto: CreateOrderDto) {
     try {
       // 1. 验证用户是否存在
       const user = await this.prisma.user.findUnique({
@@ -353,207 +345,96 @@ export class OrderService {
       // 2. 获取运营商适配器
       const adapter = this.getAdapter(dto.productOperator);
 
-      // 3. 通过适配器验证商品并获取商品信息
-      this.logger.log({
-        message: '获取商品信息',
-        operator: dto.productOperator,
-        phoneNumber: dto.phoneNumber,
-        productCode: dto.productCode,
-      });
+      let productCode: string;
+      let productName: string;
+      let priceTg: number;
+      let productUnit: string | undefined;
+      let productData: string | undefined;
+      let productDays: number | undefined;
 
-      const product = await adapter.validateAndGetProduct(
-        dto.productCode,
-        dto.phoneNumber,
-        RechargeType.VOICE,
-      );
+      // 3. 根据充值类型获取商品信息
+      if (dto.rechargeType === RechargeType.POSTPAID) {
+        // 后付费：查询账单
+        this.logger.log({
+          message: '获取后付费账单',
+          operator: dto.productOperator,
+          phoneNumber: dto.phoneNumber,
+        });
+
+        const billInfo = await adapter.getPostpaidBill!(dto.phoneNumber);
+
+        // 验证账单状态
+        if (billInfo.invoiceStatus === 'paid') {
+          throw new BadRequestException('账单已结清，无需支付');
+        }
+
+        if (!billInfo.totalUnpaid || billInfo.totalUnpaid <= 0) {
+          throw new BadRequestException('无欠费账单');
+        }
+
+        productCode = 'POSTPAID_BILL';
+        productName = 'Bill Payment';
+        priceTg = billInfo.totalUnpaid;
+        productData = JSON.stringify({
+          invoice_amount: billInfo.invoiceAmount,
+          invoice_date: billInfo.invoiceDate,
+          invoice_status: billInfo.invoiceStatus,
+        });
+
+        this.logger.log({
+          message: '账单信息获取成功',
+          operator: dto.productOperator,
+          totalUnpaid: priceTg,
+        });
+      } else {
+        // 预付费：验证商品
+        if (!dto.productCode) {
+          throw new BadRequestException('预付费订单必须提供商品代码');
+        }
+
+        this.logger.log({
+          message: '获取商品信息',
+          operator: dto.productOperator,
+          phoneNumber: dto.phoneNumber,
+          productCode: dto.productCode,
+          rechargeType: dto.rechargeType,
+        });
+
+        const product = await adapter.validateAndGetProduct(
+          dto.productCode,
+          dto.phoneNumber,
+          dto.rechargeType,
+        );
+
+        productCode = product.code;
+        productName = product.name;
+        priceTg = product.price;
+        productUnit = product.unit;
+        productData = product.data;
+        productDays = product.days;
+
+        this.logger.log({
+          message: '商品信息获取成功',
+          operator: dto.productOperator,
+          productCode,
+          productName,
+          priceTg,
+        });
+      }
 
       // 4. 获取当前汇率并计算人民币价格
       const exchangeRate =
         await this.exchangeRateService.getCurrentRate('MNT_TO_CNY');
-      const priceTg: number = product.price;
-      const priceRmb: number = Number((priceTg / exchangeRate.rate).toFixed(2));
-
-      this.logger.log({
-        message: '商品信息获取成功',
-        operator: dto.productOperator,
-        productCode: dto.productCode,
-        productName: product.name,
-        productEngName: product.engName,
-        priceTg,
-        priceRmb,
-        exchangeRate: exchangeRate.rate,
-      });
-
-      // 5. 生成订单号并创建订单
-      const orderNumber = this.generateOrderNumber();
-
-      const order = await this.prisma.order.create({
-        data: {
-          orderNumber,
-          openid,
-          phoneNumber: dto.phoneNumber,
-          productOperator: dto.productOperator,
-          productRechargeType: RechargeType.VOICE,
-          productName: product.name, // 使用 eng_name || name
-          productCode: product.code,
-          productPriceTg: priceTg,
-          productPriceRmb: priceRmb,
-          productUnit: product.unit,
-          productData: product.data,
-          productDays: product.days,
-        },
-      });
-
-      this.logger.log(`话费充值订单创建成功: ${orderNumber}, 用户: ${openid}`);
-      return order;
-    } catch (error) {
-      const err = error as Error;
-      this.logger.error('创建话费充值订单失败', {
-        message: err.message,
-        stack: err.stack,
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * 创建流量包订单（DATA）
-   * 安全性增强：后端获取最新资费并验证价格
-   */
-  async createDataPackageOrder(
-    openid: string,
-    dto: CreateDataPackageOrderDto,
-  ): Promise<Prisma.OrderGetPayload<object>> {
-    try {
-      // 1. 验证用户是否存在
-      const user = await this.prisma.user.findUnique({
-        where: { openid },
-      });
-
-      if (!user) {
-        throw new BadRequestException('用户不存在');
-      }
-
-      // 2. 获取运营商适配器
-      const adapter = this.getAdapter(dto.productOperator);
-
-      // 3. 通过适配器验证商品并获取商品信息
-      this.logger.log({
-        message: '获取商品信息',
-        operator: dto.productOperator,
-        phoneNumber: dto.phoneNumber,
-        productCode: dto.productCode,
-      });
-
-      const product = await adapter.validateAndGetProduct(
-        dto.productCode,
-        dto.phoneNumber,
-        RechargeType.DATA,
-      );
-
-      // 4. 获取当前汇率并计算人民币价格
-      const exchangeRate =
-        await this.exchangeRateService.getCurrentRate('MNT_TO_CNY');
-      const priceTg: number = product.price;
-      const priceRmb: number = Number((priceTg / exchangeRate.rate).toFixed(2));
-
-      this.logger.log({
-        message: '商品信息获取成功',
-        operator: dto.productOperator,
-        productCode: dto.productCode,
-        productName: product.name,
-        productEngName: product.engName,
-        priceTg,
-        priceRmb,
-        exchangeRate: exchangeRate.rate,
-      });
-
-      // 5. 生成订单号并创建订单
-      const orderNumber = this.generateOrderNumber();
-
-      const order = await this.prisma.order.create({
-        data: {
-          orderNumber,
-          openid,
-          phoneNumber: dto.phoneNumber,
-          productOperator: dto.productOperator,
-          productRechargeType: RechargeType.DATA,
-          productName: product.name, // 使用 eng_name || name
-          productCode: product.code,
-          productPriceTg: priceTg,
-          productPriceRmb: priceRmb,
-          productUnit: product.unit,
-          productData: product.data,
-          productDays: product.days,
-        },
-      });
-
-      this.logger.log(`流量包订单创建成功: ${orderNumber}, 用户: ${openid}`);
-      return order;
-    } catch (error) {
-      const err = error as Error;
-      this.logger.error('创建流量包订单失败', {
-        message: err.message,
-        stack: err.stack,
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * 创建账单结算订单（POSTPAID）
-   * 安全性增强：后端从账单API获取实际欠费金额
-   */
-  async createPostpaidBillOrder(
-    openid: string,
-    dto: CreatePostpaidBillOrderDto,
-  ): Promise<Prisma.OrderGetPayload<object>> {
-    try {
-      // 1. 验证用户是否存在
-      const user = await this.prisma.user.findUnique({
-        where: { openid },
-      });
-
-      if (!user) {
-        throw new BadRequestException('用户不存在');
-      }
-
-      // 2. 获取运营商适配器
-      const adapter = this.getAdapter(dto.productOperator);
-
-      // 3. 通过适配器获取后付费账单
-      this.logger.log({
-        message: '获取后付费账单',
-        operator: dto.productOperator,
-        phoneNumber: dto.phoneNumber,
-      });
-
-      const billInfo = await adapter.getPostpaidBill!(dto.phoneNumber);
-
-      // 4. 验证账单状态
-      if (billInfo.invoiceStatus === 'paid') {
-        throw new BadRequestException('账单已结清，无需支付');
-      }
-
-      if (!billInfo.totalUnpaid || billInfo.totalUnpaid <= 0) {
-        throw new BadRequestException('无欠费账单');
-      }
-
-      // 5. 获取当前汇率并计算人民币价格
-      const exchangeRate =
-        await this.exchangeRateService.getCurrentRate('MNT_TO_CNY');
-      const priceTg = billInfo.totalUnpaid;
       const priceRmb = Number((priceTg / exchangeRate.rate).toFixed(2));
 
       this.logger.log({
-        message: '账单信息获取成功',
-        operator: dto.productOperator,
+        message: '汇率计算完成',
         priceTg,
         priceRmb,
         exchangeRate: exchangeRate.rate,
       });
 
-      // 6. 生成订单号并创建订单
+      // 5. 生成订单号并创建订单
       const orderNumber = this.generateOrderNumber();
 
       const order = await this.prisma.order.create({
@@ -562,26 +443,31 @@ export class OrderService {
           openid,
           phoneNumber: dto.phoneNumber,
           productOperator: dto.productOperator,
-          productRechargeType: RechargeType.POSTPAID,
-          productName: 'Postpaid Bill Payment', // 英文账单名称
-          productCode: 'POSTPAID_BILL',
+          productRechargeType: dto.rechargeType,
+          productName,
+          productCode,
           productPriceTg: priceTg,
           productPriceRmb: priceRmb,
-          productData: JSON.stringify({
-            invoice_amount: billInfo.invoiceAmount,
-            invoice_date: billInfo.invoiceDate,
-            invoice_status: billInfo.invoiceStatus,
-          }),
+          productUnit,
+          productData,
+          productDays,
         },
       });
 
-      this.logger.log(`账单结算订单创建成功: ${orderNumber}, 用户: ${openid}`);
+      this.logger.log({
+        message: '订单创建成功',
+        orderNumber,
+        openid,
+        rechargeType: dto.rechargeType,
+      });
+
       return order;
     } catch (error) {
       const err = error as Error;
-      this.logger.error('创建账单结算订单失败', {
+      this.logger.error('创建订单失败', {
         message: err.message,
         stack: err.stack,
+        rechargeType: dto.rechargeType,
       });
       throw error;
     }

@@ -17,7 +17,10 @@ import { AdminModule } from './modules/admin/admin.module';
       isGlobal: true,
       load: [configuration],
       validate,
-      envFilePath: `.env.${process.env.NODE_ENV || 'development'}`,
+      envFilePath: [
+        `.env.${process.env.NODE_ENV || 'development'}`,
+        '.env',
+      ],
     }),
     ScheduleModule.forRoot(),
     GlobalHttpModule,

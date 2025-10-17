@@ -103,22 +103,18 @@ export class UnitelAdapter implements OperatorAdapter {
     try {
       let result;
 
+      // 构造统一的交易信息
+      const transactions = [
+        {
+          journal_id: order.orderNumber,
+          amount: order.productPriceTg.toString(),
+          description: this.getDescription(order.productRechargeType),
+          account: 'WECHAT',
+        },
+      ];
+
       if (order.productRechargeType === (RechargeType.DATA as string)) {
         // 流量包激活
-        const dataPackageDto = {
-          msisdn: order.phoneNumber,
-          package: order.productCode,
-          vatflag: '0', // 暂不开发票
-          transactions: [
-            {
-              journal_id: order.orderNumber,
-              amount: order.productPriceTg.toString(),
-              description: 'Data Package',
-              account: 'WECHAT',
-            },
-          ],
-        };
-
         this.logger.log({
           message: 'Unitel 调用流量包激活 API',
           orderNumber: order.orderNumber,
@@ -127,23 +123,30 @@ export class UnitelAdapter implements OperatorAdapter {
           amount: order.productPriceTg.toString(),
         });
 
-        result = await this.unitelService.activateDataPackage(dataPackageDto);
-      } else {
-        // 话费充值
-        const rechargeDto = {
+        result = await this.unitelService.activateDataPackage({
           msisdn: order.phoneNumber,
-          card: order.productCode,
-          vatflag: '0', // 暂不开发票
-          transactions: [
-            {
-              journal_id: order.orderNumber,
-              amount: order.productPriceTg.toString(),
-              description: 'Recharge',
-              account: 'WECHAT',
-            },
-          ],
-        };
+          package: order.productCode,
+          vatflag: '0',
+          transactions,
+        });
+      } else if (order.productRechargeType === (RechargeType.POSTPAID as string)) {
+        // 后付费账单支付
+        this.logger.log({
+          message: 'Unitel 调用后付费账单支付 API',
+          orderNumber: order.orderNumber,
+          msisdn: order.phoneNumber,
+          amount: order.productPriceTg.toString(),
+        });
 
+        result = await this.unitelService.payPostpaidBill({
+          msisdn: order.phoneNumber,
+          amount: order.productPriceTg.toString(),
+          remark: 'Bill Payment via WeChat',
+          vatflag: '0',
+          transactions,
+        });
+      } else {
+        // 话费充值 (VOICE)
         this.logger.log({
           message: 'Unitel 调用话费充值 API',
           orderNumber: order.orderNumber,
@@ -152,7 +155,12 @@ export class UnitelAdapter implements OperatorAdapter {
           amount: order.productPriceTg.toString(),
         });
 
-        result = await this.unitelService.recharge(rechargeDto);
+        result = await this.unitelService.recharge({
+          msisdn: order.phoneNumber,
+          card: order.productCode,
+          vatflag: '0',
+          transactions,
+        });
       }
 
       // 转换为统一的充值结果格式
@@ -165,6 +173,7 @@ export class UnitelAdapter implements OperatorAdapter {
       this.logger.log({
         message: `Unitel 充值${rechargeResult.result === 'success' ? '成功' : '失败'}`,
         orderNumber: order.orderNumber,
+        rechargeType: order.productRechargeType,
         result: rechargeResult.result,
         code: rechargeResult.code,
         msg: rechargeResult.msg,
@@ -177,9 +186,22 @@ export class UnitelAdapter implements OperatorAdapter {
         message: err.message,
         stack: err.stack,
         orderNumber: order.orderNumber,
+        rechargeType: order.productRechargeType,
       });
       throw error;
     }
+  }
+
+  /**
+   * 根据充值类型获取交易描述
+   */
+  private getDescription(rechargeType: string): string {
+    const descriptionMap: Record<string, string> = {
+      [RechargeType.VOICE]: 'Recharge',
+      [RechargeType.DATA]: 'Data Package',
+      [RechargeType.POSTPAID]: 'Bill Payment',
+    };
+    return descriptionMap[rechargeType] || 'Recharge';
   }
 
   /**
