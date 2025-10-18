@@ -38,12 +38,14 @@ model Order {
   productOperator     String    @map("product_operator") @db.VarChar(50)
   productRechargeType String    @map("product_recharge_type") @db.VarChar(50)
   productName         String    @map("product_name") @db.VarChar(100)
+  productEngName      String?   @map("product_eng_name") @db.VarChar(100)
   productCode         String    @map("product_code") @db.VarChar(50)
   productPriceTg      Decimal   @map("product_price_tg") @db.Decimal(10, 2)
   productPriceRmb     Decimal   @map("product_price_rmb") @db.Decimal(10, 2)
-  productUnit         String?   @map("product_unit") @db.VarChar(20)
+  productUnit         Int?      @map("product_unit")
   productData         String?   @map("product_data") @db.Text
   productDays         Int?      @map("product_days")
+  seqId               String?   @map("seq_id") @db.VarChar(100)
 
   // 订单状态
   paymentStatus  String    @default("unpaid") @map("payment_status") @db.VarChar(20)
@@ -54,6 +56,13 @@ model Order {
   paidAt         DateTime? @map("paid_at")
   rechargeAt     DateTime? @map("recharge_at")
 
+  // 乐观锁版本号（用于并发控制）
+  version        Int       @default(0) @map("version")
+
+  // 异常标记（用于记录异常订单）
+  anomalyReason  String?   @map("anomaly_reason") @db.VarChar(100)
+  anomalyDetails String?   @map("anomaly_details") @db.Text
+
   // 关联
   user           User      @relation(fields: [openid], references: [openid])
 
@@ -63,6 +72,10 @@ model Order {
   @@index([productOperator, productRechargeType])
   @@index([paymentStatus, rechargeStatus, paidAt])
   @@index([createdAt])
+  // 新增: 优化定时任务查询
+  @@index([rechargeStatus, rechargeAt, seqId])
+  @@index([paymentStatus, rechargeStatus, rechargeAt])
+  @@index([anomalyReason])
   @@map("orders")
 }
 

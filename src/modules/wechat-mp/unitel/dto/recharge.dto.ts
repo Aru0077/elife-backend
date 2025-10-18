@@ -96,4 +96,6 @@ export interface RechargeResponse {
   code: string;
   amount?: string;
   vat?: VatInfo;
+  seq_id?: string;
+  transaction_id?: string;
 }

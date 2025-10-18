@@ -47,7 +47,7 @@ export interface ProductInfo {
   name: string;
   engName?: string;
   price: number;
-  unit?: string;
+  unit?: number;
   data?: string;
   days?: number;
 }
@@ -59,6 +59,8 @@ export interface RechargeResult {
   result: 'success' | 'failed';
   code?: string;
   msg?: string;
+  seqId?: string;
+  transactionId?: string;
 }
 
 /**
@@ -69,4 +71,7 @@ export interface PostpaidBillInfo {
   invoiceStatus?: string;
   invoiceAmount?: number;
   invoiceDate?: string;
+  remainAmount?: number;
+  broadcastFee?: string;
+  invoiceUnpaid?: number;
 }

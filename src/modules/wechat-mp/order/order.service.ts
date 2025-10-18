@@ -193,8 +193,9 @@ export class OrderService {
 
       let productCode: string;
       let productName: string;
+      let productEngName: string | undefined;
       let priceTg: number;
-      let productUnit: string | undefined;
+      let productUnit: number | undefined;
       let productData: string | undefined;
       let productDays: number | undefined;
 
@@ -254,6 +255,7 @@ export class OrderService {
 
         productCode = product.code;
         productName = product.name;
+        productEngName = product.engName;
         priceTg = product.price;
         productUnit = product.unit;
         productData = product.data;
@@ -291,6 +293,7 @@ export class OrderService {
           productOperator: dto.productOperator,
           productRechargeType: dto.rechargeType,
           productName,
+          productEngName,
           productCode,
           productPriceTg: priceTg,
           productPriceRmb: priceRmb,
@@ -396,24 +399,30 @@ export class OrderService {
         throw new NotFoundException('订单不存在');
       }
 
-      // 2. 幂等性检查
+      // 2. 幂等性检查 - 已成功
       if (order.rechargeStatus === RechargeStatus.SUCCESS) {
         this.logger.warn(`订单已充值成功，跳过: ${orderNumber}`);
         return { status: 'already_success' };
       }
 
-      if (order.rechargeAt) {
-        this.logger.warn(`订单已处理过充值，跳过: ${orderNumber}`);
-        return { status: 'already_processed' };
-      }
-
-      // 3. 标记充值时间（防止重复充值）
-      await this.prisma.order.update({
-        where: { orderNumber },
+      // 3. 使用 updateMany 实现原子性标记（乐观锁）
+      // 只有当 rechargeAt 为 null 时才能标记，防止并发重复充值
+      const updated = await this.prisma.order.updateMany({
+        where: {
+          orderNumber,
+          rechargeAt: null, // 关键: 乐观锁条件
+        },
         data: {
           rechargeAt: new Date(),
         },
       });
+
+      if (updated.count === 0) {
+        this.logger.warn(
+          `订单正在被其他进程处理或已处理过，跳过: ${orderNumber}`,
+        );
+        return { status: 'already_processing' };
+      }
 
       // 4. 获取运营商适配器并执行充值
       const adapter = this.getAdapter(order.productOperator as Operator);
@@ -437,6 +446,7 @@ export class OrderService {
           rechargeStatus: isSuccess
             ? RechargeStatus.SUCCESS
             : RechargeStatus.FAILED,
+          seqId: result.seqId,
         },
       });
 

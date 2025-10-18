@@ -61,16 +61,12 @@ export class UnitelAdapter implements OperatorAdapter {
       }
 
       // 转换为统一的 ProductInfo 格式
-      // 优先使用英文名称，回退到本地名称
       const productInfo: ProductInfo = {
         code: product.code,
-        name: product.eng_name || product.name,
+        name: product.name,
         engName: product.eng_name,
         price: product.price,
-        unit:
-          'unit' in product && product.unit
-            ? product.unit.toString()
-            : undefined,
+        unit: 'unit' in product ? product.unit : undefined,
         data: product.data,
         days: product.days,
       };
@@ -109,7 +105,7 @@ export class UnitelAdapter implements OperatorAdapter {
           journal_id: order.orderNumber,
           amount: order.productPriceTg.toString(),
           description: this.getDescription(order.productRechargeType),
-          account: 'WECHAT',
+          account: '',
         },
       ];
 
@@ -126,7 +122,8 @@ export class UnitelAdapter implements OperatorAdapter {
         result = await this.unitelService.activateDataPackage({
           msisdn: order.phoneNumber,
           package: order.productCode,
-          vatflag: '0',
+          vatflag: '1',
+          vat_register_no: '',
           transactions,
         });
       } else if (
@@ -144,7 +141,8 @@ export class UnitelAdapter implements OperatorAdapter {
           msisdn: order.phoneNumber,
           amount: order.productPriceTg.toString(),
           remark: 'Bill Payment via WeChat',
-          vatflag: '0',
+          vatflag: '1',
+          vat_register_no: '',
           transactions,
         });
       } else {
@@ -160,25 +158,57 @@ export class UnitelAdapter implements OperatorAdapter {
         result = await this.unitelService.recharge({
           msisdn: order.phoneNumber,
           card: order.productCode,
-          vatflag: '0',
+          vatflag: '1',
+          vat_register_no: '',
           transactions,
+        });
+      }
+
+      // 处理运营商返回的状态
+      let finalResult: 'success' | 'failed' | 'pending';
+
+      if (result.result === 'success') {
+        finalResult = 'success';
+      } else if (result.result === 'failed') {
+        finalResult = 'failed';
+      } else if (result.result === 'pending' || !result.result) {
+        // 状态不明确或为空，标记为 pending
+        finalResult = 'pending';
+        this.logger.warn('Unitel 返回状态不明确', {
+          orderNumber: order.orderNumber,
+          apiResult: result.result,
+          apiCode: result.code,
+          apiMsg: result.msg,
+          seqId: result.seq_id,
+        });
+      } else {
+        // 未知状态，保守标记为 failed
+        finalResult = 'failed';
+        this.logger.error('Unitel 返回未知状态', {
+          orderNumber: order.orderNumber,
+          apiResult: result.result,
+          apiCode: result.code,
+          apiMsg: result.msg,
         });
       }
 
       // 转换为统一的充值结果格式
       const rechargeResult: RechargeResult = {
-        result: result.result === 'success' ? 'success' : 'failed',
+        result: finalResult,
         code: result.code,
         msg: result.msg,
+        seqId: result.seq_id,
+        transactionId: result.transaction_id,
       };
 
       this.logger.log({
-        message: `Unitel 充值${rechargeResult.result === 'success' ? '成功' : '失败'}`,
+        message: `Unitel 充值${rechargeResult.result === 'success' ? '成功' : rechargeResult.result === 'pending' ? '处理中' : '失败'}`,
         orderNumber: order.orderNumber,
         rechargeType: order.productRechargeType,
         result: rechargeResult.result,
         code: rechargeResult.code,
         msg: rechargeResult.msg,
+        seqId: rechargeResult.seqId,
       });
 
       return rechargeResult;
@@ -227,6 +257,9 @@ export class UnitelAdapter implements OperatorAdapter {
         invoiceStatus: billData.invoice_status,
         invoiceAmount: billData.invoice_amount,
         invoiceDate: billData.invoice_date,
+        remainAmount: billData.remain_amount,
+        broadcastFee: billData.broadcast_fee,
+        invoiceUnpaid: billData.invoice_unpaid,
       };
 
       this.logger.log({

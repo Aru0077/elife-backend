@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '@common/prisma/prisma.service';
 import { OrderService } from './order.service';
 import { RechargeStatus, PaymentStatus } from './enums';
+import { UnitelService } from '@modules/wechat-mp/unitel/unitel.service';
 
 @Injectable()
 export class OrderTaskService {
@@ -11,6 +12,7 @@ export class OrderTaskService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly orderService: OrderService,
+    private readonly unitelService: UnitelService,
   ) {}
 
   /**
@@ -105,6 +107,114 @@ export class OrderTaskService {
     } catch (error) {
       const err = error as Error;
       this.logger.error('查询失败充值订单异常', {
+        message: err.message,
+        stack: err.stack,
+      });
+    }
+  }
+
+  /**
+   * 每5分钟检查待确认结果的订单
+   * 查询已发送充值请求但状态仍为PENDING的订单,调用API确认最终结果
+   * 注意:此方法只查询结果更新状态,绝不重新充值!
+   */
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async checkPendingTransactionResults() {
+    try {
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+
+      // 查找已发送充值请求但仍为PENDING状态的订单
+      // 必须有 seqId 才能查询结果
+      const pendingOrders = await this.prisma.order.findMany({
+        where: {
+          paymentStatus: PaymentStatus.PAID,
+          rechargeStatus: RechargeStatus.PENDING,
+          rechargeAt: {
+            gte: twentyFourHoursAgo, // 24小时内
+            lt: fiveMinutesAgo, // 5分钟前(给充值请求一些处理时间)
+          },
+          seqId: {
+            not: null, // 必须有 seqId
+          },
+        },
+        take: 10, // 每次处理10个
+        orderBy: {
+          rechargeAt: 'asc',
+        },
+      });
+
+      if (pendingOrders.length === 0) {
+        return;
+      }
+
+      this.logger.warn(
+        `发现 ${pendingOrders.length} 个需要确认结果的 PENDING 订单`,
+      );
+
+      // 逐个查询结果
+      for (const order of pendingOrders) {
+        try {
+          if (!order.seqId) {
+            this.logger.warn(`订单 ${order.orderNumber} 没有 seqId,跳过`);
+            continue;
+          }
+
+          this.logger.log(
+            `查询订单充值结果: ${order.orderNumber}, seqId: ${order.seqId}`,
+          );
+
+          // 调用 API 查询交易结果
+          const result = await this.unitelService.checkTransactionResult({
+            seq_id: order.seqId,
+          });
+
+          this.logger.log(
+            `订单 ${order.orderNumber} 查询结果: status=${result.status}, result=${result.result}`,
+          );
+
+          // 根据结果更新订单状态
+          if (result.status === 'success') {
+            // 充值成功
+            await this.prisma.order.update({
+              where: { orderNumber: order.orderNumber },
+              data: {
+                rechargeStatus: RechargeStatus.SUCCESS,
+              },
+            });
+            this.logger.log(
+              `订单 ${order.orderNumber} 确认充值成功,已更新状态为 SUCCESS`,
+            );
+          } else if (result.status === 'failed') {
+            // 充值失败
+            await this.prisma.order.update({
+              where: { orderNumber: order.orderNumber },
+              data: {
+                rechargeStatus: RechargeStatus.FAILED,
+              },
+            });
+            this.logger.warn(
+              `订单 ${order.orderNumber} 确认充值失败,已更新状态为 FAILED`,
+            );
+          } else {
+            // 仍然 pending,不做任何操作
+            this.logger.log(
+              `订单 ${order.orderNumber} 仍在处理中,保持 PENDING 状态`,
+            );
+          }
+        } catch (error) {
+          const err = error as Error;
+          this.logger.error(`查询订单 ${order.orderNumber} 结果失败`, {
+            message: err.message,
+            stack: err.stack,
+          });
+          // 继续处理下一个订单
+          continue;
+        }
+      }
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error('检查待确认订单异常', {
         message: err.message,
         stack: err.stack,
       });

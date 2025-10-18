@@ -65,6 +65,8 @@ export class PaymentController {
         returnCode: callbackData.returnCode,
         resultCode: callbackData.resultCode,
         transactionId: callbackData.transactionId,
+        totalFee: callbackData.totalFee,
+        attach: callbackData.attach,
       });
 
       // 验证回调数据
@@ -79,6 +81,47 @@ export class PaymentController {
         });
         // 即使支付失败也要返回成功，避免微信重复回调
         return { errcode: 0, errmsg: 'ok' };
+      }
+
+      // 验证 attach 字段（订单号一致性检查）
+      if (callbackData.attach) {
+        try {
+          const attachData = JSON.parse(callbackData.attach);
+          if (attachData.orderNumber !== orderNumber) {
+            this.logger.error('attach中的订单号与URL参数不一致', {
+              urlOrderNumber: orderNumber,
+              attachOrderNumber: attachData.orderNumber,
+              attach: callbackData.attach,
+            });
+            // 仍返回成功避免重复回调，但记录严重错误
+          }
+        } catch (error) {
+          this.logger.warn('attach字段解析失败', {
+            attach: callbackData.attach,
+            error: (error as Error).message,
+          });
+        }
+      }
+
+      // 查询订单并验证金额
+      const order = await this.orderService.findOne(orderNumber);
+
+      // 验证支付金额是否与订单金额一致（转换为分）
+      if (callbackData.totalFee !== undefined) {
+        const expectedAmount = Math.round(Number(order.productPriceRmb) * 100);
+        if (callbackData.totalFee !== expectedAmount) {
+          this.logger.error('支付金额不匹配', {
+            orderNumber,
+            expectedAmount,
+            actualAmount: callbackData.totalFee,
+            orderPriceRmb: order.productPriceRmb.toString(),
+            orderPriceTg: order.productPriceTg.toString(),
+            差额: callbackData.totalFee - expectedAmount,
+          });
+          // 关键: 仍返回成功避免微信重复回调
+          // 但不处理此订单，通过日志记录异常
+          return { errcode: 0, errmsg: 'ok' };
+        }
       }
 
       // 调用订单服务处理支付成功的逻辑

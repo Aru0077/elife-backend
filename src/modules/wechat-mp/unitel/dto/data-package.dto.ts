@@ -7,7 +7,7 @@ import {
   IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { TransactionDto, RechargeResponse } from './recharge.dto';
+import { TransactionDto } from './recharge.dto';
 
 export class DataPackageDto {
   @ApiProperty({ description: '手机号码', example: '88616609' })
@@ -34,5 +34,13 @@ export class DataPackageDto {
   transactions!: TransactionDto[];
 }
 
-// 流量包激活响应（复用 RechargeResponse）
-export type DataPackageResponse = RechargeResponse;
+// 流量包激活响应（包含 seq_id 和 transaction_id）
+export interface DataPackageResponse {
+  result: string;
+  msg: string;
+  code: string;
+  amount?: string;
+  seq_id?: string;
+  transaction_id?: string;
+  [key: string]: unknown;
+}
