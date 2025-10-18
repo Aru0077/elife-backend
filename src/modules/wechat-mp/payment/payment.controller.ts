@@ -37,7 +37,6 @@ export class PaymentController {
    */
   @Post('create')
   @UseGuards(WechatAuthGuard)
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   @ApiBearerAuth()
   @ApiOperation({ summary: '创建支付订单' })
@@ -58,7 +57,6 @@ export class PaymentController {
    * 注意：跳过限流（由微信服务器调用）
    */
   @Post('callback/:orderNumber')
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   @Throttle({ default: { limit: 0 } }) // 跳过限流
   @ApiOperation({ summary: '微信支付回调' })
   async wechatCallback(

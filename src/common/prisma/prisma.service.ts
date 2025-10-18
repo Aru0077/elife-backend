@@ -12,7 +12,6 @@ import { PrismaClient } from '@prisma/client';
  */
 interface PrismaError extends Error {
   code?: string;
-  message?: string;
 }
 
 @Injectable()

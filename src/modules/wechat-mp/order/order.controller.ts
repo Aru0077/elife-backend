@@ -53,7 +53,6 @@ export class OrderController {
    * 限流: 每分钟最多10次（防止恶意刷单）
    */
   @Post()
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiOperation({ summary: '创建订单' })
   async createOrder(@CurrentUser() user: User, @Body() dto: CreateOrderDto) {
