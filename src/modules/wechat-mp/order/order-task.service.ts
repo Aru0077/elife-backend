@@ -17,8 +17,10 @@ export class OrderTaskService {
 
   /**
    * 每分钟补偿卡在 PENDING 状态的订单
-   * 处理因服务重启等原因丢失的充值任务
-   * 边界情况修复：恢复进程崩溃后卡住的订单（rechargeAt已设置但seqId为空）
+   * ⚠️ 严格条件：仅处理系统重启导致未发送API请求的订单
+   * - 条件1: rechargeAt为null（完全未开始充值）
+   * - 条件2: rechargeAt>10分钟 且 seqId为null（获取锁后崩溃，未发送API请求）
+   * ⚠️ 注意：超时订单(TIMEOUT状态)已被排除，不会被补偿充值
    */
   @Cron(CronExpression.EVERY_MINUTE)
   async retryPendingRecharges() {
@@ -35,12 +37,12 @@ export class OrderTaskService {
             lt: oneMinuteAgo,
           },
           OR: [
-            // 原有逻辑：未开始充值的订单
+            // 条件1: 完全未开始充值
             { rechargeAt: null },
-            // 新增：恢复卡住的订单（进程崩溃导致获取了锁但未发送API请求）
+            // 条件2: 获取锁后崩溃（严格条件）
             {
               rechargeAt: { lt: tenMinutesAgo }, // 10分钟前获取锁但仍未完成
-              seqId: null, // 没有发送充值请求
+              seqId: null, // 必须无seqId - 说明未发送API请求
             },
           ],
         },
@@ -125,8 +127,10 @@ export class OrderTaskService {
 
   /**
    * 每5分钟检查待确认结果的订单
-   * 查询已发送充值请求但状态仍为PENDING的订单,调用API确认最终结果
-   * 注意:此方法只查询结果更新状态,绝不重新充值!
+   * 查询已发送充值请求但状态仍为PENDING的订单，调用API确认最终结果
+   * ✅ 有效场景：API返回pending状态且有seqId的订单
+   * ⚠️ 注意：此方法只查询结果更新状态，绝不重新充值！
+   * ⚠️ 必须条件：seqId不为空（无seqId的订单无法查询）
    */
   @Cron(CronExpression.EVERY_5_MINUTES)
   async checkPendingTransactionResults() {
@@ -158,8 +162,8 @@ export class OrderTaskService {
         return;
       }
 
-      this.logger.warn(
-        `发现 ${pendingOrders.length} 个需要确认结果的 PENDING 订单`,
+      this.logger.log(
+        `发现 ${pendingOrders.length} 个有seqId的PENDING订单，可查询结果`,
       );
 
       // 逐个查询结果
@@ -225,6 +229,53 @@ export class OrderTaskService {
     } catch (error) {
       const err = error as Error;
       this.logger.error('检查待确认订单异常', {
+        message: err.message,
+        stack: err.stack,
+      });
+    }
+  }
+
+  /**
+   * 每5分钟检查超时订单（需人工核查）
+   * ⚠️ 超时订单状态未知，可能已充值也可能未充值
+   * ⚠️ 禁止自动重试，必须人工核查后处理
+   */
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async checkTimeoutOrders() {
+    try {
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+      const timeoutOrders = await this.prisma.order.findMany({
+        where: {
+          paymentStatus: PaymentStatus.PAID,
+          rechargeStatus: RechargeStatus.TIMEOUT,
+          paidAt: { gte: twentyFourHoursAgo },
+        },
+        orderBy: { paidAt: 'desc' },
+      });
+
+      if (timeoutOrders.length === 0) {
+        return;
+      }
+
+      this.logger.error(
+        `⚠️ 发现 ${timeoutOrders.length} 个超时订单（需人工核查是否已充值）`,
+      );
+
+      for (const order of timeoutOrders) {
+        this.logger.error(
+          `订单: ${order.orderNumber}, 手机: ${order.phoneNumber}, ` +
+            `金额: ${order.productPriceTg.toString()} TG, ` +
+            `充值时间: ${order.rechargeAt?.toISOString()}, ` +
+            `⚠️ 状态: 超时未知，禁止自动重试`,
+        );
+      }
+
+      // TODO: 可以在这里添加告警通知（如发送邮件、企业微信等）
+      // await this.notifyAdmin(timeoutOrders);
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error('检查超时订单异常', {
         message: err.message,
         stack: err.stack,
       });

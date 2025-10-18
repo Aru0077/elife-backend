@@ -7,6 +7,14 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaClient } from '@prisma/client';
 
+/**
+ * Prisma错误类型接口
+ */
+interface PrismaError extends Error {
+  code?: string;
+  message?: string;
+}
+
 @Injectable()
 export class PrismaService
   extends PrismaClient
@@ -67,7 +75,7 @@ export class PrismaService
       try {
         return await operation();
       } catch (error) {
-        const err = error as any;
+        const err = error as PrismaError;
 
         // 判断是否为可重试的错误
         const isRetryable =

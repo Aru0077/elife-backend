@@ -219,14 +219,10 @@ export class OrderService {
           throw new BadRequestException('无欠费账单');
         }
 
-        productCode = 'POSTPAID_BILL';
+        productCode = billInfo.invoiceDate || 'POSTPAID_BILL'; // 账单日期存productCode
         productName = 'Bill Payment';
         priceTg = billInfo.totalUnpaid;
-        productData = JSON.stringify({
-          invoice_amount: billInfo.invoiceAmount,
-          invoice_date: billInfo.invoiceDate,
-          invoice_status: billInfo.invoiceStatus,
-        });
+        productData = '0'; // 后付费无流量数据
 
         this.logger.log({
           message: '账单信息获取成功',
@@ -445,19 +441,38 @@ export class OrderService {
 
       const result = await adapter.recharge(order);
 
-      // 5. 根据充值结果更新订单状态（正确处理三种状态）
-      const rechargeStatus =
-        result.result === 'success'
-          ? RechargeStatus.SUCCESS
-          : result.result === 'pending'
-            ? RechargeStatus.PENDING
-            : RechargeStatus.FAILED;
+      // 5. 根据充值结果更新订单状态
+      let rechargeStatus: RechargeStatus;
+      if (result.result === 'success') {
+        rechargeStatus = RechargeStatus.SUCCESS;
+      } else if (result.result === 'pending') {
+        rechargeStatus = RechargeStatus.PENDING;
+      } else if (result.result === 'failed') {
+        // 明确失败 - 检查是否有seqId
+        rechargeStatus = RechargeStatus.FAILED;
+        if (!result.seqId) {
+          this.logger.warn('充值失败但无seqId，无法查询结果', {
+            orderNumber,
+            code: result.code,
+            msg: result.msg,
+          });
+        }
+      } else {
+        // 未知状态，保守处理为失败
+        rechargeStatus = RechargeStatus.FAILED;
+        this.logger.warn('充值返回未知状态', {
+          orderNumber,
+          apiResult: result.result,
+          code: result.code,
+          msg: result.msg,
+        });
+      }
 
       await this.prisma.order.update({
         where: { orderNumber },
         data: {
           rechargeStatus,
-          seqId: result.seqId,
+          seqId: result.seqId || null, // 确保记录seqId
         },
       });
 
@@ -469,6 +484,7 @@ export class OrderService {
         apiResult: result.result,
         apiCode: result.code,
         apiMessage: result.msg,
+        seqId: result.seqId,
         phoneNumber: order.phoneNumber,
         productCode: order.productCode,
       });
@@ -483,21 +499,42 @@ export class OrderService {
         result,
       };
     } catch (error) {
-      // 捕获所有异常，标记为失败
+      // 捕获所有异常，区分超时和其他错误
       const err = error as Error;
+
+      // 判断是否为超时错误
+      const isTimeout =
+        err.message?.includes('timeout') ||
+        err.message?.includes('ETIMEDOUT') ||
+        err.message?.includes('ECONNABORTED') ||
+        err.message?.includes('timed out');
+
+      const finalStatus = isTimeout
+        ? RechargeStatus.TIMEOUT
+        : RechargeStatus.FAILED;
+
       this.logger.error(`订单充值异常: ${orderNumber}`, {
         message: err.message,
         stack: err.stack,
+        isTimeout,
+        finalStatus,
+        orderNumber,
       });
 
       await this.prisma.order.update({
         where: { orderNumber },
         data: {
-          rechargeStatus: RechargeStatus.FAILED,
+          rechargeStatus: finalStatus,
         },
       });
 
-      return { status: 'error', error };
+      if (isTimeout) {
+        this.logger.error(
+          `⚠️ 订单 ${orderNumber} 充值超时，状态标记为TIMEOUT，禁止自动重试，需人工核查是否已充值`,
+        );
+      }
+
+      return { status: isTimeout ? 'timeout' : 'error', error };
     }
   }
 }

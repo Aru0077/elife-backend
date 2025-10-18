@@ -171,25 +171,17 @@ export class UnitelAdapter implements OperatorAdapter {
         finalResult = 'success';
       } else if (result.result === 'failed') {
         finalResult = 'failed';
-      } else if (result.result === 'pending' || !result.result) {
-        // 状态不明确或为空，标记为 pending
-        finalResult = 'pending';
-        this.logger.warn('Unitel 返回状态不明确', {
-          orderNumber: order.orderNumber,
-          apiResult: result.result,
-          apiCode: result.code,
-          apiMsg: result.msg,
-          seqId: result.seq_id,
-        });
       } else {
-        // 未知状态，保守标记为 failed
-        finalResult = 'failed';
-        this.logger.error('Unitel 返回未知状态', {
-          orderNumber: order.orderNumber,
-          apiResult: result.result,
-          apiCode: result.code,
-          apiMsg: result.msg,
-        });
+        // pending或未知状态，统一标记为pending
+        finalResult = 'pending';
+        if (!result.result) {
+          this.logger.warn('Unitel返回状态为空，标记为pending', {
+            orderNumber: order.orderNumber,
+            seqId: result.seq_id || result.seq,
+            apiCode: result.code,
+            apiMsg: result.msg,
+          });
+        }
       }
 
       // 转换为统一的充值结果格式
