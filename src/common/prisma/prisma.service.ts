@@ -38,13 +38,10 @@ export class PrismaService
         return;
       } catch (error) {
         const err = error as Error;
-        this.logger.error(
-          `数据库连接失败 (尝试 ${attempt}/${maxRetries})`,
-          {
-            message: err.message,
-            stack: err.stack,
-          },
-        );
+        this.logger.error(`数据库连接失败 (尝试 ${attempt}/${maxRetries})`, {
+          message: err.message,
+          stack: err.stack,
+        });
 
         if (attempt === maxRetries) {
           this.logger.error('数据库连接失败，所有重试已用尽');
@@ -90,9 +87,7 @@ export class PrismaService
         });
 
         // 指数退避重试
-        await new Promise((resolve) =>
-          setTimeout(resolve, delayMs * attempt),
-        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
       }
     }
     throw new Error('Should not reach here');

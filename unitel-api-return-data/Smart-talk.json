@@ -1,0 +1,271 @@
+// 卡类型为mart-talk通过获取资费列表接口获取到的资费
+{
+    "servicetype": "PREPAID",
+    "productid": "1331257",
+    "name": "Smart Talk",
+    "3rdparty_name": "smart-talk",
+    "billtype": "prepaid",
+    "service_bill_type": "PREPAID",
+    "status": "ACTIVE",
+    "code": "000",
+    "result": "success",
+    "msg": "success",
+    "service": {
+        "cards": {
+            "day": [
+                {
+                    "code": "ST5000",
+                    "days": 3,
+                    "eng_name": "5000 unit, 3 days, unlimited in-network call",
+                    "name": "5000 нэгж (3 хоног/сүлжээндээ хязгааргүй яриа)",
+                    "price": 5000,
+                    "short_name": "5000/3D-5000",
+                    "unit": 5000
+                },
+                {
+                    "code": "ST10000",
+                    "days": 30,
+                    "eng_name": "1000 unit, 30 days, unlimited in-network call",
+                    "name": "1000 нэгж (30xоног/сүлжээндээ хязгааргүй яриа)",
+                    "price": 10000,
+                    "short_name": "1000/30D-10000",
+                    "unit": 1000
+                },
+                {
+                    "code": "ST15000",
+                    "days": 30,
+                    "eng_name": "5000 unit, 30 days, unlimited in-network call",
+                    "name": "5000 нэгж (30 хоног/сүлжээндээ хязгааргүй яриа)",
+                    "price": 15000,
+                    "short_name": "5000/30D-15000",
+                    "unit": 5000
+                },
+                {
+                    "code": "ST25000",
+                    "data": "10GB",
+                    "days": 30,
+                    "eng_name": "5000 unit, 10GB data, 30 days, unlimited in-network call",
+                    "name": "5000 нэгж (Data 10GB/30 хоног/сүлжээндээ хязгааргүй яриа)",
+                    "price": 25000,
+                    "short_name": "5000/30D-25000",
+                    "unit": 5000
+                },
+                {
+                    "code": "ST40000",
+                    "days": 90,
+                    "eng_name": "10000 unit, 90 days, unlimited in-network call",
+                    "name": "10000 нэгж (90 xоног/сүлжээндээ хязгааргүй яриа)",
+                    "price": 40000,
+                    "short_name": "10000/90D-40000",
+                    "unit": 10000
+                },
+                {
+                    "code": "ST70000",
+                    "days": 180,
+                    "eng_name": "10000 unit, 180 days, unlimited in-network call",
+                    "name": "10000 нэгж (180 xоног/сүлжээндээ хязгааргүй яриа)",
+                    "price": 70000,
+                    "short_name": "10000/180D-70000",
+                    "unit": 10000
+                },
+                {
+                    "code": "ST120000",
+                    "days": 360,
+                    "eng_name": "10000 unit, 360 days, unlimited in-network call",
+                    "name": "10000 нэгж (360 xоног/сүлжээндээ хязгааргүй яриа)",
+                    "price": 120000,
+                    "short_name": "10000/360D-120000",
+                    "unit": 10000
+                }
+            ],
+            "noday": [
+                {
+                    "code": "ST3000",
+                    "eng_name": "3000 unit",
+                    "name": "3000 нэгж",
+                    "price": 3000,
+                    "short_name": "3000negj-3000",
+                    "unit": 3000
+                },
+                {
+                    "code": "ST20000",
+                    "eng_name": "20000 unit",
+                    "name": "20000 нэгж",
+                    "price": 20000,
+                    "short_name": "20000negj-20000",
+                    "unit": 20000
+                },
+                {
+                    "code": "ST50000",
+                    "eng_name": "50000 unit",
+                    "name": "50000 нэгж",
+                    "price": 50000,
+                    "short_name": "50000negj-50000",
+                    "unit": 50000
+                }
+            ],
+            "special": []
+        },
+        "name": "Smart-talk",
+        "data": {
+            "data": [
+                {
+                    "code": "data3gb2d",
+                    "data": "3GB",
+                    "days": 2,
+                    "eng_name": "3 GB, 2 days",
+                    "name": "3 GB",
+                    "price": 3500,
+                    "short_name": "3GB/2 honog-3500"
+                },
+                {
+                    "code": "data4gb3d",
+                    "data": "4GB",
+                    "days": 3,
+                    "eng_name": "4 GB, 3 days",
+                    "name": "4 GB (Datadi 1 эрх)",
+                    "price": 4500,
+                    "short_name": "4GB/3 honog-4500"
+                },
+                {
+                    "code": "data7gb5d",
+                    "data": "7GB",
+                    "days": 5,
+                    "eng_name": "7 GB, 5 days",
+                    "name": "7 GB (Datadi 1 эрх)",
+                    "price": 7500,
+                    "short_name": "7GB/5 honog-7500"
+                },
+                {
+                    "code": "data15gb10d",
+                    "data": "15GB",
+                    "days": 10,
+                    "eng_name": "15 GB, 10 days",
+                    "name": "15 GB (Datadi 1 эрх)",
+                    "price": 15000,
+                    "short_name": "15GB/10 honog-15000"
+                },
+                {
+                    "code": "data5gb10d",
+                    "data": "5GB",
+                    "days": 10,
+                    "eng_name": "5 GB, 10 days",
+                    "name": "5 GB (Datadi 1 эрх)",
+                    "price": 8000,
+                    "short_name": "5GB/10 honog-8000"
+                },
+                {
+                    "code": "data22gb20d",
+                    "data": "22GB",
+                    "days": 20,
+                    "eng_name": "22 GB, 20 days",
+                    "name": "22 GB (Datadi 1 эрх)",
+                    "price": 25000,
+                    "short_name": "22GB/20 honog-25000"
+                },
+                {
+                    "code": "data6gb30d",
+                    "data": "6GB",
+                    "days": 30,
+                    "eng_name": "6 GB, 30 days",
+                    "name": "6 GB (Datadi 1 эрх)",
+                    "price": 15000,
+                    "short_name": "6GB/30 honog-15000"
+                },
+                {
+                    "code": "data50gb30d",
+                    "data": "50GB",
+                    "days": 30,
+                    "eng_name": "50 GB, 30 days 30%OFF",
+                    "name": "50 GB (x3 хурд) 30%OFF (Datadi 1 эрх)",
+                    "price": 35000,
+                    "short_name": "50GB/30 honog-35000"
+                },
+                {
+                    "code": "data100gb30d",
+                    "data": "100GB",
+                    "days": 30,
+                    "eng_name": "100 GB, 30 days 30%OFF",
+                    "name": "100 GB (x3 хурд) 30%OFF (Datadi 1 эрх)",
+                    "price": 63000,
+                    "short_name": "100GB/30 honog-63000"
+                }
+            ],
+            "days": [],
+            "entertainment": [
+                {
+                    "code": "gaming1gb7d",
+                    "data": "Хязгааргүй",
+                    "days": 7,
+                    "eng_name": "Gaming (PUBG, ML, Roblox…)",
+                    "name": "Gaming (PUBG, ML, Robox…)",
+                    "price": 2000,
+                    "short_name": "GAMING-2000"
+                },
+                {
+                    "code": "newsunl30d",
+                    "data": "Хязгааргүй",
+                    "days": 30,
+                    "eng_name": "News (Unread, ikon.mn…)",
+                    "name": "News (Unread, ikon.mn…)",
+                    "price": 2000,
+                    "short_name": "NEWS-2000"
+                },
+                {
+                    "code": "gaming2gb30d",
+                    "data": "Хязгааргүй",
+                    "days": 30,
+                    "eng_name": "Gaming (PUBG, ML, Roblox…)",
+                    "name": "Gaming (PUBG, ML, Robox…)",
+                    "price": 5000,
+                    "short_name": "GAMING-5000"
+                },
+                {
+                    "code": "musicunl30d",
+                    "data": "Хязгааргүй",
+                    "days": 30,
+                    "eng_name": "Music  (Apple music, Spotify…)",
+                    "name": "Music  (Apple music, Spotify…)",
+                    "price": 5000,
+                    "short_name": "MUSIC-5000"
+                },
+                {
+                    "code": "stream20gb30d",
+                    "data": "20GB",
+                    "days": 30,
+                    "eng_name": "Streaming 15GB (Netflix, LookTV…)",
+                    "name": "Streaming (Netflix, LookTV…)",
+                    "price": 15000,
+                    "short_name": "STREAMING-15000"
+                },
+                {
+                    "code": "emeeting10gb7d",
+                    "data": "10GB",
+                    "days": 7,
+                    "eng_name": "EMeeting (Teams, Telegram, Skype…)",
+                    "name": "EMeeting (Teams, Telegram, Skype…)",
+                    "price": 5000,
+                    "short_name": "EMEETING/10GB-5000"
+                },
+                {
+                    "code": "emeeting25gb30d",
+                    "data": "25GB",
+                    "days": 30,
+                    "eng_name": "EMeeting (Teams, Telegram, Skype…)",
+                    "name": "EMeeting (Teams, Telegram, Skype…)",
+                    "price": 10000,
+                    "short_name": "EMEETING/25GB-10000"
+                },
+                {
+                    "code": "datalooktv30d",
+                    "data": "Хязгааргүй",
+                    "days": 30,
+                    "eng_name": "LookTV, 30 days",
+                    "name": "LookTV",
+                    "price": 2900,
+                    "short_name": "LOOKTV-2900"
+                }
+            ]
+        }
+    }
+}
