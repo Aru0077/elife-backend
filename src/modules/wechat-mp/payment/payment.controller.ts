@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { OrderService } from '@modules/wechat-mp/order/order.service';
 import { PaymentService } from './payment.service';
 import { WechatAuthGuard } from '@modules/wechat-mp/auth/guards/wechat-auth.guard';
@@ -32,9 +33,11 @@ export class PaymentController {
   /**
    * 创建支付订单
    * 调用微信统一下单接口，返回小程序支付参数
+   * 限流: 每分钟最多20次（防止恶意刷单）
    */
   @Post('create')
   @UseGuards(WechatAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @ApiBearerAuth()
   @ApiOperation({ summary: '创建支付订单' })
   async createPayment(
@@ -51,8 +54,10 @@ export class PaymentController {
    * 微信支付回调接口
    * 重要：此接口由微信服务器调用，不需要用户认证
    * 必须返回 { errcode: 0 } 格式，否则微信会持续重试
+   * 注意：跳过限流（由微信服务器调用）
    */
   @Post('callback/:orderNumber')
+  @Throttle({ default: { limit: 0 } }) // 跳过限流
   @ApiOperation({ summary: '微信支付回调' })
   async wechatCallback(
     @Param('orderNumber') orderNumber: string,
@@ -86,8 +91,14 @@ export class PaymentController {
       // 验证 attach 字段（订单号一致性检查）
       if (callbackData.attach) {
         try {
-          const attachData = JSON.parse(callbackData.attach);
-          if (attachData.orderNumber !== orderNumber) {
+          const attachData = JSON.parse(callbackData.attach) as {
+            orderNumber?: string;
+            phoneNumber?: string;
+          };
+          if (
+            attachData.orderNumber &&
+            attachData.orderNumber !== orderNumber
+          ) {
             this.logger.error('attach中的订单号与URL参数不一致', {
               urlOrderNumber: orderNumber,
               attachOrderNumber: attachData.orderNumber,

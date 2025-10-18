@@ -135,13 +135,14 @@ export interface GetPostpaidBillResponse {
  * 支付后付费账单响应
  */
 export interface PayPostpaidBillResponse {
-  result: string;
+  result: string; // 'success' | 'failed' | 'pending'
   code: string;
   msg: string;
-  transaction_id?: string;
-  seq_id?: string;
-  amount?: string;
-  [key: string]: unknown; // 允许其他未知字段
+  transaction_id?: string; // 交易ID(项目中不使用)
+  seq?: string; // 序列ID,用于查询充值结果(checkTransactionResult使用)
+  seq_id?: string; // 兼容旧API返回格式
+  amount?: string; // 金额(项目中不使用)
+  [key: string]: unknown; // 允许其他字段,但项目中忽略
 }
 
 /**

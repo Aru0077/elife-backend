@@ -56,7 +56,7 @@ export interface ProductInfo {
  * 充值结果
  */
 export interface RechargeResult {
-  result: 'success' | 'failed';
+  result: 'success' | 'failed' | 'pending';
   code?: string;
   msg?: string;
   seqId?: string;

@@ -35,7 +35,7 @@ export class OrderService {
    */
   private generateOrderNumber(): string {
     const timestamp = Date.now().toString();
-    const random = nanoid(8);
+    const random = nanoid(12); // 从8位增加到12位，降低碰撞风险
     return `ORD${timestamp}${random}`;
   }
 
@@ -406,11 +406,18 @@ export class OrderService {
       }
 
       // 3. 使用 updateMany 实现原子性标记（乐观锁）
-      // 只有当 rechargeAt 为 null 时才能标记，防止并发重复充值
+      // 防止并发重复充值,同时恢复超时卡住的订单
+      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
       const updated = await this.prisma.order.updateMany({
         where: {
           orderNumber,
-          rechargeAt: null, // 关键: 乐观锁条件
+          OR: [
+            { rechargeAt: null }, // 原有逻辑：未开始充值
+            {
+              rechargeAt: { lt: tenMinutesAgo }, // 超时卡住的订单
+              seqId: null, // 且未发送充值请求
+            },
+          ],
         },
         data: {
           rechargeAt: new Date(),
@@ -438,23 +445,27 @@ export class OrderService {
 
       const result = await adapter.recharge(order);
 
-      // 5. 根据充值结果更新订单状态
-      const isSuccess = result.result === 'success';
+      // 5. 根据充值结果更新订单状态（正确处理三种状态）
+      const rechargeStatus =
+        result.result === 'success'
+          ? RechargeStatus.SUCCESS
+          : result.result === 'pending'
+            ? RechargeStatus.PENDING
+            : RechargeStatus.FAILED;
+
       await this.prisma.order.update({
         where: { orderNumber },
         data: {
-          rechargeStatus: isSuccess
-            ? RechargeStatus.SUCCESS
-            : RechargeStatus.FAILED,
+          rechargeStatus,
           seqId: result.seqId,
         },
       });
 
       this.logger.log({
-        message: `订单充值${isSuccess ? '成功' : '失败'}`,
+        message: `订单充值${rechargeStatus === RechargeStatus.SUCCESS ? '成功' : rechargeStatus === RechargeStatus.PENDING ? '处理中' : '失败'}`,
         orderNumber,
         operator: order.productOperator,
-        rechargeStatus: isSuccess ? 'success' : 'failed',
+        rechargeStatus,
         apiResult: result.result,
         apiCode: result.code,
         apiMessage: result.msg,
@@ -462,7 +473,15 @@ export class OrderService {
         productCode: order.productCode,
       });
 
-      return { status: isSuccess ? 'success' : 'failed', result };
+      return {
+        status:
+          rechargeStatus === RechargeStatus.SUCCESS
+            ? 'success'
+            : rechargeStatus === RechargeStatus.PENDING
+              ? 'pending'
+              : 'failed',
+        result,
+      };
     } catch (error) {
       // 捕获所有异常，标记为失败
       const err = error as Error;

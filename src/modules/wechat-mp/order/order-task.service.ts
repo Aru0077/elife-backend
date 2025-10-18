@@ -17,22 +17,32 @@ export class OrderTaskService {
 
   /**
    * 每分钟补偿卡在 PENDING 状态的订单
-   * 处理因服务重启等原因丢失的充值任务 daixiufu
+   * 处理因服务重启等原因丢失的充值任务
+   * 边界情况修复：恢复进程崩溃后卡住的订单（rechargeAt已设置但seqId为空）
    */
   @Cron(CronExpression.EVERY_MINUTE)
   async retryPendingRecharges() {
     try {
       // 查找 PENDING 状态且 rechargeAt 为空的订单（1 分钟前的）
       const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
+      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
 
       const pendingOrders = await this.prisma.order.findMany({
         where: {
           paymentStatus: PaymentStatus.PAID,
           rechargeStatus: RechargeStatus.PENDING,
-          rechargeAt: null,
           paidAt: {
             lt: oneMinuteAgo,
           },
+          OR: [
+            // 原有逻辑：未开始充值的订单
+            { rechargeAt: null },
+            // 新增：恢复卡住的订单（进程崩溃导致获取了锁但未发送API请求）
+            {
+              rechargeAt: { lt: tenMinutesAgo }, // 10分钟前获取锁但仍未完成
+              seqId: null, // 没有发送充值请求
+            },
+          ],
         },
         take: 10, // 每次处理 10 个，避免过载
         orderBy: {
@@ -121,7 +131,7 @@ export class OrderTaskService {
   @Cron(CronExpression.EVERY_5_MINUTES)
   async checkPendingTransactionResults() {
     try {
-      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
       // 查找已发送充值请求但仍为PENDING状态的订单
@@ -131,7 +141,7 @@ export class OrderTaskService {
           paymentStatus: PaymentStatus.PAID,
           rechargeStatus: RechargeStatus.PENDING,
           rechargeAt: {
-            gte: twentyFourHoursAgo, // 24小时内
+            gte: twelveHoursAgo, // 12小时内（优化：从24小时缩短到12小时,减少API调用）
             lt: fiveMinutesAgo, // 5分钟前(给充值请求一些处理时间)
           },
           seqId: {

@@ -8,6 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { OrderService } from './order.service';
 import { WechatAuthGuard } from '@modules/wechat-mp/auth/guards/wechat-auth.guard';
 import { CurrentUser } from '@modules/wechat-mp/auth/decorators/current-user.decorator';
@@ -49,8 +50,10 @@ export class OrderController {
   /**
    * 创建订单（统一接口）
    * 支持话费充值、流量包、账单结算
+   * 限流: 每分钟最多10次（防止恶意刷单）
    */
   @Post()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiOperation({ summary: '创建订单' })
   async createOrder(@CurrentUser() user: User, @Body() dto: CreateOrderDto) {
     return await this.orderService.createOrder(user.openid, dto);

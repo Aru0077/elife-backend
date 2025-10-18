@@ -197,7 +197,7 @@ export class UnitelAdapter implements OperatorAdapter {
         result: finalResult,
         code: result.code,
         msg: result.msg,
-        seqId: result.seq_id,
+        seqId: result.seq || result.seq_id, // 优先使用seq,兼容seq_id
         transactionId: result.transaction_id,
       };
 

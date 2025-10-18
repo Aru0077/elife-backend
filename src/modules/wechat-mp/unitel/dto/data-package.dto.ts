@@ -34,13 +34,14 @@ export class DataPackageDto {
   transactions!: TransactionDto[];
 }
 
-// 流量包激活响应（包含 seq_id 和 transaction_id）
+// 流量包激活响应
 export interface DataPackageResponse {
-  result: string;
+  result: string; // 'success' | 'failed' | 'pending'
   msg: string;
   code: string;
-  amount?: string;
-  seq_id?: string;
-  transaction_id?: string;
-  [key: string]: unknown;
+  amount?: string; // 金额(项目中不使用)
+  seq?: string; // 序列ID,用于查询充值结果(checkTransactionResult使用)
+  seq_id?: string; // 兼容旧API返回格式
+  transaction_id?: string; // 交易ID(项目中不使用)
+  [key: string]: unknown; // 允许其他字段,但项目中忽略
 }

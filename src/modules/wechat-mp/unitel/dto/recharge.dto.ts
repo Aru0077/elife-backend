@@ -91,11 +91,12 @@ export interface VatInfo {
 
 // 充值响应
 export interface RechargeResponse {
-  result: string;
+  result: string; // 'success' | 'failed' | 'pending'
   msg: string;
   code: string;
   amount?: string;
-  vat?: VatInfo;
-  seq_id?: string;
-  transaction_id?: string;
+  vat?: VatInfo; // 发票信息(项目中不使用)
+  seq?: string; // 序列ID,用于查询充值结果(checkTransactionResult使用)
+  seq_id?: string; // 兼容旧API返回格式
+  transaction_id?: string; // 交易ID(项目中不使用)
 }

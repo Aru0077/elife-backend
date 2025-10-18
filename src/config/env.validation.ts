@@ -29,15 +29,7 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  WECHAT_SECRET = '';
-
-  @IsString()
-  @IsOptional()
   WECHAT_MP_APPID = '';
-
-  @IsString()
-  @IsOptional()
-  WECHAT_MP_SECRET = '';
 
   @IsString()
   @IsOptional()
